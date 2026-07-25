@@ -11,6 +11,7 @@
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
 #   make clean                   build/ を削除
+#   make help                    コマンド一覧を表示(引数なしの make も同じ)
 #
 # ビルドはすべて Docker コンテナ内で実行する(pandoc / typst / plantuml と
 # フォントは Dockerfile が固定バージョン+チェックサム検証で導入する。
@@ -22,7 +23,6 @@
 # 空チェックで案内エラーを出す)。
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
-NAME       := $(basename $(notdir $(SRC)))
 BUILD      := build
 
 # 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
@@ -31,6 +31,9 @@ BUILD      := build
 SRC_IS_DIR := $(shell [ -d "$(SRC)" ] && echo 1)
 
 ifeq ($(SRC_IS_DIR),1)
+# ディレクトリ名には basename を適用しない(docs/spec.v2 のようにドットを
+# 含む名前が spec へ切り詰められ、docs/spec.v3 と出力先が衝突するため)。
+NAME               := $(notdir $(SRC))
 CHAPTER_FILES      := $(sort $(wildcard $(SRC)/[0-9][0-9]-*.md))
 META_FILE          := $(SRC)/00-meta.md
 NON_META_CHAPTERS  := $(filter-out $(META_FILE),$(CHAPTER_FILES))
@@ -38,6 +41,7 @@ SRC_INPUTS         := $(CHAPTER_FILES)
 REV_MD             := $(SRC)/revisions.md
 REV_YAML           := $(SRC)/revisions.yaml
 else
+NAME                := $(basename $(notdir $(SRC)))
 CHAPTER_FILES       :=
 META_FILE           :=
 NON_META_CHAPTERS   :=
@@ -112,6 +116,13 @@ fi
 	esac; \
 fi
 @if [ -d "$(SRC)" ]; then \
+	for cf in "$(SRC)"/[0-9][0-9]-*.md; do \
+		case "$$cf" in \
+			*" "*) \
+				echo "ERROR: 章ファイル名にスペースは使えません: $$cf(Make の引数分割の制約のため。ファイル名からスペースを除いてください)。" >&2; \
+				exit 1 ;; \
+		esac; \
+	done; \
 	if [ ! -f "$(SRC)/00-meta.md" ]; then \
 		echo "ERROR: $(SRC)/00-meta.md が見つかりません(章別ファイル分割には 00-meta.md が必須です。README の「章別ファイル分割」参照)。" >&2; \
 		exit 1; \
@@ -149,7 +160,24 @@ CONTAINER_ENV := \
 # root 所有で残ると消せなくなるため)。
 DOCKER_RUN := docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work
 
-.PHONY: pdf example pdf-all docker-build validate watch clean lint lint-src test
+.PHONY: help pdf example pdf-all docker-build validate watch clean lint lint-src test
+
+# 引数なしの `make` は使い方を表示する(既定を pdf にすると SRC 必須の
+# エラーだけが出て、何をすればよいか分からないため)。
+.DEFAULT_GOAL := help
+
+help:
+	@echo "使い方:"
+	@echo "  make pdf SRC=docs/foo.md     単一 Markdown ファイルをビルド"
+	@echo "  make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド"
+	@echo "  make example                 同梱サンプル 2 種をビルド"
+	@echo "  make pdf-all                 docs/ 配下を自動発見して全件ビルド"
+	@echo "  make watch SRC=docs/foo.md   執筆中の自動リビルド(Ctrl-C で終了)"
+	@echo "  make lint                    docs/ と examples/ の簡易 lint"
+	@echo "  make test                    scripts/lint.sh の回帰テスト"
+	@echo "  make clean                   build/ を削除"
+	@echo ""
+	@echo "詳細は README.md を参照してください。"
 
 # SRC の検証を独立ターゲットにして、イメージ構築(docker-build)より先に
 # 安価な検証で失敗できるようにする(prerequisite の並び順で先行させる)。
@@ -182,7 +210,14 @@ pdf-all:
 	for d in docs/*/; do \
 		[ -d "$$d" ] || continue; \
 		d=$${d%/}; \
-		[ -f "$$d/00-meta.md" ] || continue; \
+		if [ ! -f "$$d/00-meta.md" ]; then \
+			for cf in "$$d"/[0-9][0-9]-*.md; do \
+				[ -f "$$cf" ] || continue; \
+				echo "ERROR: $$d に 00-meta.md がありません(章ファイルが置かれているため章別ファイル分割と思われます。00-meta.md がないとビルド対象として検出されないため、エラーで停止します。README の「章別ファイル分割」参照)。" >&2; \
+				exit 1; \
+			done; \
+			continue; \
+		fi; \
 		found=1; \
 		$(MAKE) pdf SRC="$$d" || exit 1; \
 	done; \

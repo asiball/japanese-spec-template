@@ -46,6 +46,13 @@ write() {
 	cat > "$case_dir/$1"
 }
 
+# write の CRLF 版(Windows のエディタが保存した原稿を再現する)。sed の \r は
+# 環境によって解釈が異なるため awk で組み立てる。
+write_crlf() {
+	mkdir -p "$case_dir/$(dirname "$1")"
+	awk '{ printf "%s\r\n", $0 }' > "$case_dir/$1"
+}
+
 # サンドボックス内から lint.sh を実行し、終了コードと出力(stdout+stderr)を
 # last_status / last_output に保存する。
 run_lint() {
@@ -195,6 +202,55 @@ write docs/quoted-empty2.md <<-'EOF'
 	EOF
 expect_error "title: の値が空です" docs/quoted-empty2.md
 
+new_case "CRLF 改行の単一ファイルは指摘なし"
+write_crlf docs/crlf.md <<-'EOF'
+	---
+	title: "CRLF テスト仕様書"
+	---
+
+	# はじめに
+
+	本文。
+	EOF
+expect_ok docs/crlf.md
+
+new_case "CRLF 改行でも title の空は検出する"
+write_crlf docs/crlf-empty-title.md <<-'EOF'
+	---
+	title: ""
+	---
+
+	# はじめに
+	EOF
+expect_error "title: の値が空です" docs/crlf-empty-title.md
+
+# --- 表紙ロゴ ---------------------------------------------------------------
+
+new_case "logo: が指す画像が存在しないとエラー"
+write docs/logo-missing.md <<-'EOF'
+	---
+	title: テスト仕様書
+	logo: "/assets/images/no-such-logo.png"
+	---
+
+	# はじめに
+	EOF
+expect_error "logo: が指す画像が存在しません" docs/logo-missing.md
+
+new_case "logo: が指す画像が存在すれば正常"
+write docs/logo-ok.md <<-'EOF'
+	---
+	title: テスト仕様書
+	logo: "/assets/images/logo.png"
+	---
+
+	# はじめに
+	EOF
+write assets/images/logo.png <<-'EOF'
+	dummy
+	EOF
+expect_ok docs/logo-ok.md
+
 # --- 章別ファイル分割 -------------------------------------------------------
 
 new_case "章別ファイル分割の正常形は指摘なし"
@@ -217,6 +273,21 @@ write docs/spec/00-meta.md <<-'EOF'
 	---
 	EOF
 write docs/spec/01-intro.md <<-'EOF'
+	---
+	title: 上書きしてしまうタイトル
+	---
+
+	# はじめに
+	EOF
+expect_error "章ファイルの先頭に YAML フロントマター" docs/spec/00-meta.md docs/spec/01-intro.md
+
+new_case "CRLF 改行でも章ファイルへのフロントマター混入を検出する"
+write_crlf docs/spec/00-meta.md <<-'EOF'
+	---
+	title: 章別テスト仕様書
+	---
+	EOF
+write_crlf docs/spec/01-intro.md <<-'EOF'
 	---
 	title: 上書きしてしまうタイトル
 	---
@@ -417,6 +488,89 @@ write docs/fenced-diagram.md <<-'EOF'
 	EOF
 expect_ok docs/fenced-diagram.md
 
+new_case "リスト項目内のインデントされたフェンス内は検査しない"
+write docs/list-fenced.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 図の書き方
+
+	- 次のように参照する:
+
+	    ```markdown
+	    ![図](/build/diagrams/example.svg)
+	    ```
+
+	- 以上。
+	EOF
+expect_ok docs/list-fenced.md
+
+new_case "引用ブロック内のフェンス内は検査しない"
+write docs/quote-fenced.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 図の書き方
+
+	> ```markdown
+	> ![図](/build/diagrams/example.svg)
+	> ```
+	EOF
+expect_ok docs/quote-fenced.md
+
+new_case "インデントされたフェンスの閉じ後は検査される"
+write docs/list-fenced-closed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	- 例:
+
+	    ```markdown
+	    ![図](/build/diagrams/example.svg)
+	    ```
+
+	![実参照](/build/diagrams/example.svg)
+	EOF
+expect_error "対応する PlantUML ソースが存在しません" docs/list-fenced-closed.md
+
+# --- assets 配下の参照先 ----------------------------------------------------
+
+new_case "/assets/ 配下の参照先が存在しないとエラー"
+write docs/missing-image.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	![構成図](/assets/images/no-such-image.png){width=70%}
+	EOF
+expect_error "参照先のファイルが存在しません" docs/missing-image.md
+
+new_case "/assets/ 配下の参照先が存在すれば正常"
+write docs/existing-image.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	![構成図](/assets/images/overview.png){width=70%}
+	EOF
+write assets/images/overview.png <<-'EOF'
+	dummy
+	EOF
+expect_ok docs/existing-image.md
+
+new_case "外部 URL の画像参照は存在チェックの対象外"
+write docs/remote-image.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	![外部図](https://example.com/foo.png)
+	EOF
+expect_ok docs/remote-image.md
+
 new_case "1 行に複数の図参照があってもすべて検査される"
 write docs/multi-ref.md <<-'EOF'
 	---
@@ -527,6 +681,12 @@ write docs/foo.revisions.md <<-'EOF'
 	# 1. フロントマターも採番エラーもあるが対象外
 	EOF
 expect_ok docs/foo.revisions.md
+
+new_case "*.revisions.yaml は検査対象外"
+write docs/foo.revisions.yaml <<-'EOF'
+	revisions: []
+	EOF
+expect_ok docs/foo.revisions.yaml
 
 new_case "章別ディレクトリの revisions.md / revisions.yaml は検査対象外"
 write docs/spec/revisions.md <<-'EOF'

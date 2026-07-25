@@ -134,6 +134,11 @@ RUN set -eu; \
 	echo "fcac737e761ec63dbfbdce11030a1780161920d80315edba9c8beff1c2bac5a2  /opt/fonts/LICENSE-SourceHanSans.txt" | sha256sum -c -; \
 	curl -fsSL -o /opt/fonts/LICENSE-SourceHanCodeJP.txt "$base/source-han-code-jp/2.012R/LICENSE.txt"; \
 	echo "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2  /opt/fonts/LICENSE-SourceHanCodeJP.txt" | sha256sum -c -; \
+	# fontconfig のキャッシュをイメージに焼き込む。ビルドは
+	# `docker run --user $(id -u)` で実行されるため、実行時は
+	# /var/cache/fontconfig にも $HOME にも書けず、キャッシュがないと
+	# PlantUML(Java/AWT)の実行のたびにフォント走査が走る(警告も出る)。
+	fc-cache -f >/dev/null; \
 	apk del curl
 
 WORKDIR /work

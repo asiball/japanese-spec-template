@@ -31,9 +31,14 @@ awk '
 		return n
 	}
 	{
-		c = substr($0, 1, 1)
+		# フェンス判定は行頭の空白・引用符号を落としてから行う(リスト項目や
+		# 引用の中に書かれたフェンスも認識するため。lint.sh と同じ判定仕様)。
+		marker = $0
+		sub(/\r$/, "", marker)
+		sub(/^[ \t>]*/, "", marker)
+		c = substr(marker, 1, 1)
 		if (c == "`" || c == "~") {
-			n = fence_run($0)
+			n = fence_run(marker)
 			if (n >= 3) {
 				if (in_fence == 0) {
 					in_fence = 1
@@ -41,7 +46,7 @@ awk '
 					fence_len = n
 					next
 				}
-				rest = substr($0, n + 1)
+				rest = substr(marker, n + 1)
 				gsub(/[ \t]/, "", rest)
 				if (c == fence_char && n >= fence_len && rest == "") {
 					in_fence = 0

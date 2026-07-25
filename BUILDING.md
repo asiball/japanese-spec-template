@@ -103,6 +103,8 @@ docker build --build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest> -t jp-spec-bui
 
 **図中テキストのフォントについて**: 全 PlantUML 図には `template/plantuml.config` が共通適用され、図中テキストのフォントを本文と同じ `Source Han Sans JP` に指定しています。生成される SVG はテキストをアウトライン化せずフォント名参照のまま保持し、Typst が `/opt/fonts`(`--font-path`)から解決して描画するため、最終 PDF のフォントは実行環境に依存しません。またイメージには `/opt/fonts` を参照する fontconfig 設定を焼き込んであり、PlantUML(Java)によるテキスト幅の計測も同じフォントで行われます(計測フォントが異なると、ラベル幅と図形サイズがずれることがあります)。
 
+fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き込んでいます。ビルドは `docker run --user $(id -u)` で実行され、実行時は `/var/cache/fontconfig` にも `$HOME` にも書き込めないため、キャッシュがないと PlantUML の実行のたびにフォント走査が発生します(`Fontconfig error: No writable cache directories` の警告も出ます)。フォントを差し替える場合も、この `fc-cache` 実行はフォント導入レイヤーの末尾に残してください。
+
 ### 別フォントへの差し替え手順(例: UDEV Gothic など)
 
 1. `Dockerfile` のフォント導入レイヤーの一覧(URL と sha256)を、新しいフォントの取得先に差し替える。ライセンス文書の取得もあわせて差し替える(Web 配布されていないフォントを使う場合は、取得の代わりに `COPY` で `/opt/fonts` へ配置する形に変えてもよい)。
@@ -117,7 +119,7 @@ docker build --build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest> -t jp-spec-bui
 - **バージョンピン**: pandoc(ベースイメージ)・typst・plantuml・フォントのすべてを `Dockerfile` で固定し、typst / plantuml / フォントは sha256 検証付きで取得しています。PlantUML はバージョンによって図のレイアウトが微妙に変わるため、図の見た目も含めてイメージのバージョン固定が効きます。
 - **`--ignore-system-fonts`**: `typst compile` に必ず付与し、実行環境にインストールされているフォントの影響を受けないようにしています。フォントはイメージ内の `/opt/fonts`(`--font-path`)のみを参照します。
 - **`date: none`**: `spec-doc` 内部で PDF のドキュメントメタデータの `date` は常に `none` に設定しています(ビルド実行時刻を PDF に埋め込まない)。表紙に表示される発行日は YAML メタデータの `date` フィールド(文字列)であり、ビルド時刻とは無関係です。
-- **CI での検証**: GitHub Actions(`.github/workflows/build.yml`)が PR のたびに `make pdf` で同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルドし、固定ツールチェーンの取得(ベースイメージのタグ・typst / plantuml / フォントの sha256 検証を含む)から PDF 生成までを通しで検証します。生成された PDF はワークフローのアーティファクトとしてダウンロードでき、PR 上で見た目を確認できます。
+- **CI での検証**: GitHub Actions(`.github/workflows/build.yml`)が PR のたびに `make pdf` で同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルドし、固定ツールチェーンの取得(ベースイメージのタグ・typst / plantuml / フォントの sha256 検証を含む)から PDF 生成までを通しで検証します。生成された PDF はワークフローのアーティファクトとしてダウンロードでき、PR 上で見た目を確認できます。main への push でも同じワークフローを実行します(Actions のキャッシュは既定ブランチで作られたものだけが他ブランチから読めるため、main での実行が Docker イメージキャッシュの供給源になります)。
 
 ## シンタックスハイライト
 
