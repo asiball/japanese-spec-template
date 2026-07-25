@@ -20,8 +20,8 @@ make clean                    # build/ を削除
 ビルドはすべて Docker コンテナ内で実行される(pandoc / typst / plantuml とフォントはイメージ内に固定バージョン+チェックサム検証で導入。ローカルへのインストールは不要で、Docker と make だけが必要)。`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容(+検証系オーバーライド)から自動導出される内容ハッシュのため、ツールチェーンやフォントの固定バージョンを変更しても手動でバンプする必要はない(`Dockerfile` を変更すれば自動的に別タグになり、利用者側の次回ビルドで再構築が走る)。`make pdf` は次の順で実行されます(検証は `Makefile`、ビルド本体はコンテナ内の `scripts/container-build.sh`)。
 
 1. `SRC` の存在確認(章別ファイル分割の場合は `00-meta.md` と章ファイルの有無、参照図に対応する `.puml` の有無)と改訂履歴ファイルの併存チェックを行い、続けて Docker イメージを用意する(未構築・ツールチェーン変更時のみ実体の構築が走る)。
-2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェックする(`make lint` は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。ただし改訂履歴ファイル `*.revisions.md` / `<name>/revisions.md` は仕様書本文ではないため lint.sh 側で除外される。`.revisions.yaml` / `revisions.yaml` も対象外)。
-   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に `00-meta.md` 以外の章ファイルへ YAML フロントマターが混入していること(後方ファイルが前方を上書きする合成規則による事故防止。下記「章別ファイル分割」参照)、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)。
+2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェックする(`make lint` は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。ただし改訂履歴ファイル `*.revisions.md` / `<name>/revisions.md` は仕様書本文ではないため lint.sh 側で除外される。`*.revisions.yaml` / `revisions.yaml` も対象外)。行末が CRLF の原稿もそのまま検査できる(行末の CR は読み込み時に落とす)。
+   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に `00-meta.md` 以外の章ファイルへ YAML フロントマターが混入していること(後方ファイルが前方を上書きする合成規則による事故防止。下記「章別ファイル分割」参照)、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)、`/assets/` 配下の参照先ファイル・フロントマターの `logo:` が指す画像の不存在。
    - **警告(ビルド継続)**: 見出しが数字で始まる(`## 2.5 系` 等。上記エラーパターンに一致しない、手動採番の疑いがあるだけのケース)、生 Typst(` ```{=typst} `)ブロック内の装飾コード(`set text(` 等)、章別ファイル分割時に同一ディレクトリ内の章ファイル間で脚注定義 ID(`[^id]:`)が重複していること。
 3. ビルド対象が画像参照している PlantUML 変換図(`/build/diagrams/*.svg`。参照の抽出は `scripts/list-diagram-refs.sh` がコードフェンス除外付きで行う)について、名前の 1:1 対応で逆引きしたソース(`assets/diagrams/<name>.puml`)を `scripts/puml2svg.sh` で変換する(変更分のみ。図を参照しない文書では plantuml 不要)。全図に `template/plantuml.config`(図中フォント・配色などの共通デザイン)が `-config` として共通適用される。
 4. `pandoc --from markdown --to typst --standalone --template template/template.typ -o build/obj/<name>.typ <SRC_INPUTS>`。`<SRC_INPUTS>` は単一ファイルモードでは `SRC` 1 個、章別ファイル分割モードでは `00-meta.md` を含む章ファイル一覧(ファイル名の辞書順)。pandoc は複数の入力ファイルを連結して 1 文書として処理でき、章の自動採番・ファイル横断リンク・脚注・表番号・表紙/目次のいずれも単一ファイルと同様に正しく動作する。改訂履歴の別ファイルがある場合は `--metadata-file` が自動付与される: `revisions.md`(単一ファイルモードでは `docs/<name>.revisions.md`。推奨。Markdown パイプ表)なら `scripts/revisions-md2yaml.sh` が `build/obj/<name>.revisions.yaml` へ変換してから、`revisions.yaml`(単一ファイルモードでは `docs/<name>.revisions.yaml`。代替)ならそのまま渡される。**両方が存在するとエラーで停止する**。`SRC` に `.revisions.md` / `.revisions.yaml` そのものを指定してもエラーで停止する。
@@ -31,7 +31,7 @@ make clean                    # build/ を削除
 
 CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples のサンプル 2 種(章別ファイル分割・単一ファイル)をビルド検証し、続けて `make pdf-all` で docs/ 配下の利用者の文書をビルド検証する(テンプレート時点では docs/ が空のため no-op)。
 
-`SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパスも対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
+`SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパス、およびその中の章ファイル名も対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
 
 `make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(監視対象の章ファイル一覧・参照図の `.puml` 一覧はポーリングのたびに動的に再導出されるため、章ファイルの新規追加・削除や図参照の増減があっても `make watch` の再起動は不要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
 
@@ -39,7 +39,7 @@ CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples 
 
 `SRC` にディレクトリを指定すると(例: `docs/my-spec`)、章ごとに分けた複数の Markdown ファイルを 1 文書としてビルドできる。ディレクトリ規約:
 
-- **`00-meta.md`**: フロントマター専用・必須。ここにのみ `title` 等のメタデータを書く。
+- **`00-meta.md`**: フロントマター専用・必須。ここにのみ `title` 等のメタデータを書く(章ファイルだけを置いて `00-meta.md` を忘れたディレクトリは `make pdf-all` がエラーで停止する。無言でビルド対象から漏れるのを防ぐため)。
 - **`[0-9][0-9]-*.md`**: 章ファイル。ファイル名の辞書順が章順(`00-meta.md` は自然に先頭に来る)。1 つ以上必須。後から章を挿入しやすいよう `10-`, `20-`, `30-` のように番号を飛ばして振る運用も可。
 - **`revisions.md`(推奨)/ `revisions.yaml`(代替)**: 単一ファイルモードの `<name>.revisions.md` / `<name>.revisions.yaml` と同じ仕組み(README の「改訂履歴の別ファイル化」参照)。
 

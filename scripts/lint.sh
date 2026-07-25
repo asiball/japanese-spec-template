@@ -21,6 +21,8 @@
 #     規約)、/build/diagrams/<name>.svg 形式(ルート絶対パス)でない図の
 #     参照、参照 SVG に対応する assets/diagrams/<name>.puml の不存在
 #     (いずれもビルド後半で分かりにくいエラーになるため早期に止める)
+#   - /assets/ 配下の参照先ファイル(図版など)・フロントマターの logo: が
+#     指す画像の不存在(同上)
 #
 # 警告(exit 0。ビルドは継続):
 #   - 見出しが数字で始まる(`## 2.5 系` 等。手動採番の疑いがあるだけの場合)
@@ -29,9 +31,27 @@
 #
 # コードフェンスの中身は誤検知を避けるためスキップする(```{=typst} の中身
 # だけは装飾コード検出の対象)。改訂履歴ファイル(*.revisions.md /
-# revisions.md / revisions.yaml)は仕様書本文ではないため対象外。
+# *.revisions.yaml / revisions.md / revisions.yaml)は仕様書本文ではないため
+# 対象外。
+#
+# 行末の CR(CRLF 改行)は読み込み時に落とす。pandoc は CRLF をそのまま扱える
+# ため、Windows のエディタが保存した原稿で lint だけが落ちる(フロントマター
+# の --- が "---\r" になり検出できない)のを避ける。
 # =============================================================================
 set -eu
+
+CR=$(printf '\r')
+TAB=$(printf '\t')
+
+# YAML のスカラー値から前後の空白とクォートを外す(`title: ""` のような
+# クォートだけの空値も空と判定できるようにするため、クォートを外した後に
+# もう一度空白を落とす)。
+unquote() {
+	printf '%s' "$1" \
+		| sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+		| sed -E "s/^\"(.*)\"\$/\\1/; s/^'(.*)'\$/\\1/" \
+		| sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//'
+}
 
 if [ "$#" -eq 0 ]; then
 	set -- docs/*.md examples/*.md
@@ -56,7 +76,7 @@ trap 'rm -rf "$tmp"' EXIT
 for f in "$@"; do
 	[ -f "$f" ] || continue
 	case "$f" in
-		*.revisions.md) continue ;;
+		*.revisions.md|*.revisions.yaml) continue ;;
 	esac
 	base=$(basename "$f")
 	case "$base" in
@@ -77,38 +97,50 @@ for f in "$@"; do
 
 	if [ "$is_chapter_mode" -eq 1 ] && [ "$base" != "00-meta.md" ]; then
 		# --- 章ファイル: フロントマター混入チェック ---
-		first_line=$(head -n1 "$f" || true)
+		first_line=$(head -n1 "$f" | tr -d "$CR" || true)
 		if [ "$first_line" = "---" ]; then
 			echo "ERROR: $f: 章ファイルの先頭に YAML フロントマター(---)が見つかりました。フロントマターは 00-meta.md にのみ書いてください(pandoc で複数ファイルを連結する際、後方ファイルのフロントマターが前方を上書きするため、章ファイルへの混入は意図しない上書き事故につながります)。" >&2
 			found_error=1
 		fi
 	else
 		# --- フロントマターの title: チェック(単一ファイルモード / 00-meta.md) ---
-		first_line=$(head -n1 "$f" || true)
+		first_line=$(head -n1 "$f" | tr -d "$CR" || true)
 		if [ "$first_line" != "---" ]; then
 			echo "ERROR: $f: YAML フロントマター(ファイル先頭の --- ブロック)が見つかりません(表紙・ヘッダに title が必要です)。" >&2
 			found_error=1
 		else
-			fm_end_lineno=$(awk 'NR>1 && $0=="---" {print NR; exit}' "$f")
+			fm_end_lineno=$(awk '{ sub(/\r$/, "") } NR>1 && $0=="---" {print NR; exit}' "$f")
 			if [ -z "$fm_end_lineno" ]; then
 				echo "ERROR: $f: YAML フロントマターの終端(---)が見つかりません(表紙・ヘッダに title が必要です)。" >&2
 				found_error=1
 			else
-				title_value=$(awk -v end="$fm_end_lineno" 'NR>1 && NR<end && $0 ~ /^title:[[:space:]]*/ {sub(/^title:[[:space:]]*/, ""); print; exit}' "$f")
-				has_title=$(awk -v end="$fm_end_lineno" 'NR>1 && NR<end && $0 ~ /^title:[[:space:]]*/ {print "1"; exit}' "$f")
+				title_value=$(awk -v end="$fm_end_lineno" '{ sub(/\r$/, "") } NR>1 && NR<end && $0 ~ /^title:[[:space:]]*/ {sub(/^title:[[:space:]]*/, ""); print; exit}' "$f")
+				has_title=$(awk -v end="$fm_end_lineno" '{ sub(/\r$/, "") } NR>1 && NR<end && $0 ~ /^title:[[:space:]]*/ {print "1"; exit}' "$f")
 				if [ -z "$has_title" ]; then
 					echo "ERROR: $f: YAML フロントマターに title: が見つかりません(表紙・ヘッダに必要です)。" >&2
 					found_error=1
 				else
-					trimmed_title=$(printf '%s' "$title_value" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
-					# クォートで囲まれた値は中身を取り出して判定する
-					# (`title: ""` / `title: ' '` のようなクォートだけの
-					# 空値も見逃さないため)。
-					unquoted_title=$(printf '%s' "$trimmed_title" | sed -E "s/^\"(.*)\"\$/\\1/; s/^'(.*)'\$/\\1/" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+					unquoted_title=$(unquote "$title_value")
 					if [ -z "$unquoted_title" ]; then
 						echo "ERROR: $f: YAML フロントマターの title: の値が空です(表紙・ヘッダに必要です)。" >&2
 						found_error=1
 					fi
+				fi
+
+				# --- フロントマターの logo: の存在チェック ---
+				# 表紙ロゴのパス誤りは typst compile まで進んでから分かりに
+				# くいエラーになるため、画像・図の参照と同様に早期に止める。
+				logo_value=$(awk -v end="$fm_end_lineno" '{ sub(/\r$/, "") } NR>1 && NR<end && $0 ~ /^logo:[[:space:]]*/ {sub(/^logo:[[:space:]]*/, ""); print; exit}' "$f")
+				if [ -n "$logo_value" ]; then
+					logo_path=$(unquote "$logo_value")
+					case "$logo_path" in
+						/*)
+							if [ ! -f "${logo_path#/}" ]; then
+								echo "ERROR: $f: フロントマターの logo: が指す画像が存在しません: $logo_path(リポジトリルートからの絶対パスで、実在するファイルを指定してください)。" >&2
+								found_error=1
+							fi
+							;;
+					esac
 				fi
 			fi
 		fi
@@ -122,15 +154,28 @@ for f in "$@"; do
 
 	while IFS= read -r line || [ -n "$line" ]; do
 		lineno=$((lineno + 1))
+		line=${line%"$CR"}
 
-		case "$line" in
+		# フェンス判定は行頭の空白・引用符号を落としてから行う。CommonMark は
+		# リスト項目や引用の中でもフェンスを開始でき(実際にインデントして
+		# 書かれる)、桁 0 のフェンスしか認識しないと、記法の説明としてフェンス
+		# 内に書いた図参照を実参照と誤検出してビルドを止めてしまう。
+		marker=$line
+		while :; do
+			case $marker in
+				' '*|"$TAB"*|'>'*) marker=${marker#?} ;;
+				*) break ;;
+			esac
+		done
+
+		case "$marker" in
 			'`'*|'~'*)
 				# CommonMark はフェンス文字の行頭連続数(run 長)で開始・終了を
 				# 判定する。4 バッククォート以上のフェンス内に ``` が現れても
 				# 誤って閉じないよう、run 長を実際に数える必要がある(run<3 は
 				# インラインコード等でありフェンスではないので何もしない)。
-				fchar=${line%"${line#?}"}
-				rest=$line
+				fchar=${marker%"${marker#?}"}
+				rest=$marker
 				run=0
 				while [ "${rest#"$fchar"}" != "$rest" ]; do
 					run=$((run + 1))
@@ -215,6 +260,16 @@ for f in "$@"; do
 							echo "ERROR: $f:$lineno: PlantUML 変換図の参照は /build/diagrams/<name>.svg 形式(リポジトリルートからの絶対パス)で書いてください: $target" >&2
 							found_error=1
 							;;
+						/assets/*)
+							# 図版のパス誤りは typst compile まで進んでから
+							# 分かりにくいエラーになるため早期に止める
+							# (assets/ 配下はリポジトリ内のファイルなので、
+							# ビルド前に存在を確定できる)。
+							if [ ! -f "${target#/}" ]; then
+								echo "ERROR: $f:$lineno: 参照先のファイルが存在しません: $target" >&2
+								found_error=1
+							fi
+							;;
 					esac
 				done
 				;;
@@ -258,7 +313,7 @@ for accum in "$tmp"/footnotes-*.txt; do
 done
 
 if [ "$found_error" -eq 1 ]; then
-	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・PlantUML 参照の不備のいずれかが見つかりました。上記の該当行を修正してください。" >&2
+	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・図/画像参照の不備のいずれかが見つかりました。上記の該当行を修正してください。" >&2
 	exit 1
 fi
 
