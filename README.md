@@ -100,7 +100,7 @@ flowchart LR
 │   ├── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(ビルド時に自動実行)
 │   ├── puml2svg.sh                   PlantUML → SVG 変換(ビルド時に自動実行)
 │   └── list-diagram-refs.sh          Markdown が参照する図の列挙(Makefile が変換対象の決定に使用)
-├── .vscode/                          VS Code の推奨拡張と Tinymist の設定(下記「エディタ内での Typst プレビュー」参照)
+├── .vscode/                          VS Code の推奨拡張と Tinymist の設定(任意。下記「エディタ内での Typst プレビュー」参照)
 ├── .github/workflows/build.yml       CI(PR ごとに lint・lint.sh の回帰テスト・サンプルビルド・docs/ の自動ビルド検証を実行)
 ├── Dockerfile                        ビルド環境(pandoc / typst / plantuml とフォントを固定バージョンで同梱。BUILDING.md 参照)
 ├── .dockerignore                     ビルドコンテキストの除外指定(Dockerfile は COPY を行わないため全除外)
@@ -209,41 +209,23 @@ make watch SRC=docs/foo         # 章別ファイル分割ディレクトリを�
 
 ## エディタ内での Typst プレビュー
 
-PDF ビューアを開き直さずに仕上がりを確認したい場合は、VS Code の [Tinymist Typst](https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist) 拡張のライブプレビューを `make watch` と組み合わせます。VS Code の Markdown プレビューと同じ感覚で、原稿を保存するたびにエディタ内のプレビューが更新されます。
-
-`make watch` は原稿を保存するたびに中間生成物 `build/obj/<name>.typ` を再生成します。この `.typ` を Tinymist のプレビューで開いておけば、再生成のたびにプレビューが自動で再描画されます(PDF を経由しません)。
-
-```
-docs/foo.md を保存
-  → make watch:  lint → 図の変換 → pandoc → build/obj/foo.typ を再生成
-  → Tinymist:    .typ の更新を検知して VS Code 内のプレビューを再描画
-```
+PDF ビューアを開き直さずに仕上がりを確認したい場合は、VS Code の [Tinymist Typst](https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist) 拡張のライブプレビューを `make watch` と組み合わせます。`make watch` は原稿を保存するたびに中間生成物 `build/obj/<name>.typ` を再生成するので、この `.typ` を Tinymist のプレビューで開いておけば、保存のたびにエディタ内のプレビューが再描画されます(PDF を経由しません)。
 
 ### 準備(最初の 1 回だけ)
 
-1. VS Code でこのリポジトリのルートをワークスペースとして開く(`/assets/images/...` や `/build/diagrams/...` というルート絶対パスの参照が、ビルドの `--root .` と同じくワークスペースルート基準で解決されるようにするため)。推奨拡張の通知から **Tinymist Typst** をインストールします(`.vscode/extensions.json` に登録済み)。
-2. フォントを書き出します。
-
-   ```sh
-   make fonts
-   ```
-
-   ビルドで使うフォントは Docker イメージ内(`/opt/fonts`)にしかなく、拡張に同梱された Typst からは参照できません。`make fonts` はイメージからフォントを `.fonts/`(git 管理対象外)へ取り出します。`.vscode/settings.json` の `tinymist.fontPaths` がこのディレクトリを指しているため、設定変更は不要です。**書き出す前は和文が代替フォントで表示され、ビルド結果と見た目が一致しません。**
-3. 一度 `make pdf SRC=docs/foo.md`(または `make watch`)を実行して、プレビュー対象の `build/obj/foo.typ` を生成しておきます。
+1. VS Code でこのリポジトリのルートをワークスペースとして開きます(`/assets/images/...` などのルート絶対パスの参照が、ビルドの `--root .` と同じくワークスペースルート基準で解決されるようにするためです)。
+2. `make fonts` を実行してフォントを書き出します。ビルドで使うフォントは Docker イメージ内(`/opt/fonts`)にしかなく、拡張に同梱された Typst からは参照できないため、イメージから `.fonts/`(git 管理対象外)へ取り出します。`.vscode/settings.json` の `tinymist.fontPaths` がこのディレクトリを指しているため、設定変更は不要です。**書き出す前は和文が代替フォントで表示され、ビルド結果と見た目が一致しません。**
+3. 推奨拡張の通知から **Tinymist Typst** をインストールします(`.vscode/extensions.json` に登録済み)。
 
 ### 使い方
 
-```sh
-make watch SRC=docs/foo.md
-```
-
-を起動したまま、VS Code で `build/obj/foo.typ` を開き、エディタ右上のプレビューボタン(またはコマンドパレットで「Typst Preview」)からプレビューを開始します。プレビューを原稿の隣に並べておけば、`docs/foo.md` を保存するたびに反映されます。
+`make watch SRC=docs/foo.md` を起動したままにします。プレビュー対象の `.typ` の名前は `SRC` から決まり、初回ビルドで生成されます(`docs/foo.md` → `build/obj/foo.typ`、章別ファイル分割 `docs/my-spec` → `build/obj/my-spec.typ`)。この `.typ` を VS Code で開き、エディタ右上のプレビューアイコン(またはコマンドパレットで「Typst Preview」)からプレビューを開始して、原稿の隣に並べておきます。保存から反映までは数秒かかります(`make watch` が 1 秒間隔のポーリングで pandoc を再実行するため)。
 
 **注意**:
 
-- **成果物の PDF はあくまで `make pdf` / `make watch`(コンテナ内の Typst)が生成するものです**。プレビューは拡張に同梱された Typst でコンパイルされるためバージョンが一致するとは限らず、細部が異なる可能性があります。納品前の最終確認は必ず `build/<name>.pdf` で行ってください(`.vscode/settings.json` では、生成元を一本化するため拡張側の PDF 書き出しを無効にしています)。
-- プレビューに表示されるのは pandoc が生成した `.typ` なので、**編集するのは常に `docs/*.md` 側**です。`build/obj/*.typ` を直接編集しても次の再生成で失われます(同じ理由で拡張側の自動整形も無効にしています)。
-- `template/spec.typ` を編集した場合も、プレビューは自動で追随します(`.typ` が `/template/spec.typ` を import しているため)。
+- **成果物の PDF はあくまで `make pdf` / `make watch`(コンテナ内の Typst)が生成するものです**。プレビューは拡張に同梱された Typst でコンパイルされるためバージョンが一致するとは限らず、細部が異なる可能性があります。納品前の最終確認は必ず `build/<name>.pdf` で行ってください。
+- プレビューに表示されるのは pandoc が生成した `.typ` なので、**編集するのは常に `docs/*.md` 側**です。`build/obj/*.typ` を直接編集しても次の再生成で失われます。
+- **プレビューが更新されないときは `make watch` のターミナルを確認してください**。lint や pandoc がエラーになると `.typ` が再生成されず、プレビューは古い内容のまま変化しません。
 - フォントを差し替えたとき(`Dockerfile` のフォント導入レイヤーを変更したとき)は、`make fonts` を実行し直してください。
 
 ## 図の挿入(画像と PlantUML)
@@ -273,7 +255,7 @@ PlantUML で書ける図は、**ソース(`.puml`)だけを Git 管理し、SVG 
 
 運用上のポイント:
 
-- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml)による `.puml` のサイドプレビューが便利です。
+- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml。`.vscode/extensions.json` に推奨拡張として登録済み)による `.puml` のサイドプレビューが便利です。
 - **図中テキストのフォントは本文と同じフォント(Source Han Sans JP)に統一されます**。`template/plantuml.config` が全図に共通適用されるためで、SVG 内のテキストは Typst がイメージ内のフォント(`/opt/fonts`)から解決して描画します。配色(参加者・状態・グループ枠の背景色や罫線色など)も本文の紙面テーマ(`template/spec.typ` の配色)に統一されます。図の見た目に関する共通設定を増やしたい場合もこのファイルに書きます(個々の図固有の設定は各 `.puml` に書いてかまいません)。
 - **参照は `/build/diagrams/<name>.svg` 形式(ルート絶対パス)で書いてください**。`.puml` の直接参照・相対パス参照・対応する `.puml` が存在しない参照は、`scripts/lint.sh` がエラーでビルドを停止します。
 - **PlantUML・Graphviz のインストールは不要です**。ビルドに使う Docker イメージに固定バージョンが同梱されています(バージョン・チェックサム検証は [BUILDING.md](BUILDING.md) 参照)。

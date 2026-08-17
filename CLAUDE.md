@@ -36,7 +36,7 @@ CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples 
 
 `make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(監視対象の章ファイル一覧・参照図の `.puml` 一覧はポーリングのたびに動的に再導出されるため、章ファイルの新規追加・削除や図参照の増減があっても `make watch` の再起動は不要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
 
-PDF ビューアが自動リロードしない環境向けに、`make watch` と VS Code の Tinymist 拡張を組み合わせて `build/obj/<name>.typ` をエディタ内でライブプレビューする運用も用意している(`.vscode/` の設定と `make fonts` によるフォント書き出しがその前提。詳細は README の「エディタ内での Typst プレビュー」節)。プレビューは拡張同梱の Typst でコンパイルされるため、最終確認は `build/<name>.pdf`(下記の PNG 書き出し)で行う。
+`.vscode/` と `make fonts` は、`make watch` が再生成する `build/obj/<name>.typ` を VS Code の Tinymist 拡張でライブプレビューするための設定とフォント書き出し(詳細は README の「エディタ内での Typst プレビュー」節)。プレビューは拡張同梱の Typst でコンパイルされるため、見た目の最終確認は `build/<name>.pdf` で行う。
 
 ## 章別ファイル分割
 
@@ -105,4 +105,4 @@ PDF ビューアが自動リロードしない環境向けに、`make watch` と
 
 PlantUML 図の見た目(図中フォント・配色などの共通デザイン)だけは `template/plantuml.config` が担う(`spec.typ` は SVG の中身に関与できないため)。個々の図固有の `skinparam` は各 `.puml` に書いてよい。
 
-フォント自体を差し替える場合は、`template/spec.typ` のフォント定数だけでなく `Dockerfile` のフォント導入レイヤー(取得 URL と sha256)と `template/plantuml.config` の `defaultFontName` もあわせて変更する(手順は BUILDING.md の「フォント」節参照)。
+フォント自体を差し替える場合は、`template/spec.typ` のフォント定数だけでなく `Dockerfile` のフォント導入レイヤー(取得 URL と sha256)と `template/plantuml.config` の `defaultFontName` もあわせて変更する(手順は BUILDING.md の「フォント」節参照)。エディタ内 Typst プレビューを使っている場合は `make fonts` も実行し直す。

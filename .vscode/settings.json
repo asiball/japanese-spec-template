@@ -1,21 +1,17 @@
 {
-	// Tinymist(Typst 拡張)のエディタ内プレビューを、コンテナ内のビルドと
-	// 同じ条件で動かすための設定。Tinymist は拡張に同梱された Typst で
-	// build/obj/<name>.typ をコンパイルするため、フォントの解決条件を
-	// scripts/container-build.sh の typst 呼び出しに合わせる必要がある。
-	// 詳細は README の「エディタ内での Typst プレビュー」参照。
+	// Tinymist のエディタ内プレビューを、コンテナ内ビルド(scripts/container-build.sh
+	// の typst 呼び出し)と同じ条件に合わせる設定。詳細は README の
+	// 「エディタ内での Typst プレビュー」参照。
 
-	// ビルドの --font-path 相当。イメージ内 /opt/fonts と同じフォントを参照
-	// する(`make fonts` がイメージから .fonts/ へ書き出す)。書き出す前は
-	// 和文フォントが解決できずプレビューが代替フォントになる。
+	// ビルドの --root . 相当。
+	"tinymist.rootPath": "${workspaceFolder}",
+	// ビルドの --font-path 相当(`make fonts` の書き出し先)。
 	"tinymist.fontPaths": ["${workspaceFolder}/.fonts"],
-	// ビルドの --ignore-system-fonts 相当。ローカルにインストールされた同名
-	// フォントが混ざってプレビューとビルドで見た目がずれるのを防ぐ。
+	// ビルドの --ignore-system-fonts 相当。ホスト側の同名フォントが混ざると
+	// プレビューとビルドで見た目がずれる。
 	"tinymist.systemFonts": false,
-	// build/obj/<name>.typ は pandoc の生成物なので、整形しても次の再生成で
-	// 失われる(かつ整形結果は成果物に影響しない)。
+	// build/obj/*.typ は pandoc の生成物で、整形しても次の再生成で失われる。
 	"tinymist.formatterMode": "disable",
-	// PDF は make(コンテナ内の typst)が唯一の生成元。拡張側から別条件で
-	// 書き出すと成果物がどちらのものか分からなくなる。
+	// PDF の生成元は make(コンテナ内の typst)に一本化する。
 	"tinymist.exportPdf": "never"
 }

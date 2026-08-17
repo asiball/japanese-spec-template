@@ -26,10 +26,9 @@
 override SRC := $(patsubst %/,%,$(SRC))
 BUILD      := build
 
-# エディタ内プレビュー(Tinymist)がイメージ内 /opt/fonts と同じフォントを
-# 参照できるようにするための書き出し先(make fonts。.vscode/settings.json の
-# tinymist.fontPaths と対になる)。ビルド自体はこのディレクトリを使わない。
-FONTS      := .fonts
+# make fonts の書き出し先(.vscode/settings.json の tinymist.fontPaths と対。
+# レシピで rm -rf するためコマンドラインからの上書きを override で禁止する)。
+override FONTS := .fonts
 
 # 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
 # 専用、[0-9][0-9]-*.md が章ファイルでファイル名の辞書順が章順(規約の詳細は
@@ -260,13 +259,12 @@ watch: validate docker-build
 	@echo "watch: $(SRC) の変更を監視します(Ctrl-C で終了)"
 	$(DOCKER_RUN) --init -it -e WATCH=1 $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
 
-# エディタ内プレビュー(Tinymist)用のフォント書き出し。Tinymist は拡張に
-# 同梱された Typst で .typ をコンパイルするため、イメージ内 /opt/fonts を
-# 参照できない。ビルドと同じ見た目にするにはイメージから取り出す必要がある
-# (ホストへのフォントのインストールは不要にするというテンプレートの方針上、
-# 利用者に手動インストールを求めない)。書き出し先は .gitignore 済み。
-# ライセンス文書もフォントと同じ場所に置く(OFL の再配布条件)。
+# エディタ内プレビュー(Tinymist)用のフォント書き出し。Tinymist は拡張同梱の
+# Typst で .typ をコンパイルするため、イメージ内 /opt/fonts を参照できない。
+# 書き出し先は毎回作り直す(cp の上書きだけでは差し替え前の旧フォントが残り、
+# プレビューだけ古いファミリー名を解決できてしまうため)。
 fonts: docker-build
+	@rm -rf "$(FONTS)"
 	@mkdir -p "$(FONTS)"
 	$(DOCKER_RUN) $(DOCKER_FULLTAG) sh -c 'cp -R /opt/fonts/. "$(FONTS)/"'
 	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「エディタ内での Typst プレビュー」参照)"

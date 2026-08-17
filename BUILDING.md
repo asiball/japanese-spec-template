@@ -111,6 +111,7 @@ fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き
 2. `fontTools` 等で正しいファミリー名を確認する(`Source Han Code JP` の例のように、見かけと実際の解決名が異なることがあるため、必ず実際にコンパイルして確認すること)。
 3. `template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` を新しいファミリー名に書き換える。PlantUML 図を使っている場合は `template/plantuml.config` の `defaultFontName` もあわせて書き換える(図中テキストも Typst が同じ仕組みでフォント解決するため)。
 4. `make pdf` を実行し、`Typst warning: unknown font family: ...` が出ないことを確認する(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため、`Dockerfile` を変更した時点で自動的に再構築される。PlantUML 図がある場合は図中テキストの描画も確認する)。
+5. エディタ内 Typst プレビュー(README の「エディタ内での Typst プレビュー」節)を使っている場合は、`make fonts` を実行し直して `.fonts/` を新しいフォントで書き出し直す。
 
 ## ビルドの決定性について
 
