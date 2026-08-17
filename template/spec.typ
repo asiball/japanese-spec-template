@@ -272,13 +272,20 @@
   // ---- 相互参照 ----
   // 見出しへの @ラベル 参照を「1章」「1.1節」「1.1.1項」の和文順で表記する
   // (既定は supplement が先に付く「節 1.1」の英文順で、章・節・項の区別も
-  // ない)。番号なし見出し({.unnumbered})への参照は既定表記のままとする。
+  // ない)。番号を表示しない見出し(H4 以降の小見出しと {.unnumbered})は
+  // 見出しテキストのリンクにする(既定挙動は前者に本文に表示されない番号を
+  // 与え、後者を「cannot reference heading without numbering」のコンパイル
+  // エラーにしてしまうため、どちらも自前で描画する)。
   show ref: it => {
     let el = it.element
-    if el != none and el.func() == heading and el.numbering != none {
-      let nums = numbering(el.numbering, ..counter(heading).at(el.location()))
-      let unit = if el.level == 1 { "章" } else if el.level == 2 { "節" } else { "項" }
-      link(el.location())[#nums#unit]
+    if el != none and el.func() == heading {
+      if el.numbering != none and el.level <= 3 {
+        let nums = numbering(el.numbering, ..counter(heading).at(el.location()))
+        let unit = if el.level == 1 { "章" } else if el.level == 2 { "節" } else { "項" }
+        link(el.location())[#nums#unit]
+      } else {
+        link(el.location(), el.body)
+      }
     } else {
       it
     }
@@ -399,6 +406,9 @@
   // 分割を許可する(継続ページのヘッダ行は table.header の繰り返しで再掲
   // され、上下のアクセント罫線も分割片ごとに描画される)。
   show figure.where(kind: table): set block(breakable: true)
+  // 分割位置がキャプション(表は position: top)の直後に来ると、キャプション
+  // だけが前ページ末尾に孤立するため、キャプションを直後の表本体に結合する。
+  show figure.caption.where(position: top): it => block(sticky: true, it)
 
   // ---- 脚注 ----
   set footnote.entry(separator: thin-rule(width: footnote-separator-width, weight: 0.5pt))

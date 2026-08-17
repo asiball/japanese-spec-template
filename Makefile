@@ -209,6 +209,7 @@ pdf-all:
 		[ -f "$$f" ] || continue; \
 		case "$$f" in \
 			*.revisions.md) continue ;; \
+			docs/_*) continue ;; \
 		esac; \
 		name=$${f#docs/}; name=$${name%.md}; \
 		if [ -d "docs/$$name" ]; then \

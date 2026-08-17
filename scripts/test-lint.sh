@@ -581,17 +581,32 @@ write docs/indented-code-fence.md <<-'EOF'
 	EOF
 expect_error "見出しに手動採番が付与されています" docs/indented-code-fence.md
 
-new_case "インデントコードブロック内の図参照は検査しない"
-write docs/indented-code-ref.md <<-'EOF'
+new_case "ネストしたリスト項目(4 スペース)内の図参照も検査される"
+write docs/nested-list-ref.md <<-'EOF'
 	---
 	title: テスト仕様書
 	---
 
-	# 記法の説明
+	# 構成
 
+	- 外側の項目
+	  - 内側の項目:
 	    ![図](/build/diagrams/nonexistent.svg)
 	EOF
-expect_ok docs/indented-code-ref.md
+expect_error "対応する PlantUML ソースが存在しません" docs/nested-list-ref.md
+
+new_case "リスト項目の 4 スペース継続行の画像参照も検査される"
+write docs/list-continuation-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 構成
+
+	- 箇条書きの項目です。
+	    ![存在しない画像](/assets/images/nonexistent.png)
+	EOF
+expect_error "参照先のファイルが存在しません" docs/list-continuation-ref.md
 
 new_case "インラインコード内の図参照は検査しない"
 write docs/inline-code-ref.md <<-'EOF'
