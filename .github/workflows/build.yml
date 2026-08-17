@@ -46,11 +46,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Docker image
         id: image-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /tmp/jp-spec-builder.tar
           key: docker-image-${{ hashFiles('Dockerfile') }}
@@ -88,7 +88,7 @@ jobs:
         run: docker save -o /tmp/jp-spec-builder.tar jp-spec-builder
 
       - name: Upload PDFs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pdfs
           path: build/*.pdf

@@ -48,7 +48,7 @@ $if(organization)$
   organization: [$organization$],
 $endif$
 $if(logo)$
-  logo: "$logo$",
+  logo: content-to-string([$logo$]),
 $endif$
 $if(revisions)$
   revisions: (

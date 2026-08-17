@@ -45,6 +45,17 @@
 // 表紙ロゴの描画高さ(cover-page で使用。横幅はアスペクト比に応じて自動)。
 #let logo-height = 12mm
 
+// ---- Pandoc 橋渡し用ヘルパー ---------------------------------------------
+// Pandoc テンプレートの変数展開はマークアップ用エスケープ(`_` → `\_` 等)を
+// 含むため、パスとして使う値を文字列リテラルで受けると壊れる。content として
+// 受けてから素のテキストへ戻す(template.typ の logo 橋渡しで使用)。
+#let content-to-string(c) = {
+  if type(c) == str { c } else if c.has("text") { c.text } else if c.has("children") {
+    let s = c.children.map(content-to-string).join("")
+    if s == none { "" } else { s }
+  } else if c.has("body") { content-to-string(c.body) } else { "" }
+}
+
 // ---- 和文組版グリッド ----------------------------------------------------
 // Typst 既定の top-edge(グリフ実測)のままだと、欧文・インラインコード混在行
 // で行送りが変動する。okumuralab/typst-js(MIT-0)の cjkheight(0.88em)に
@@ -373,6 +384,12 @@
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: image): set figure.caption(position: bottom)
   show figure.caption: set text(font: font-sans, size: 9pt)
+
+  // Pandoc は表を figure(kind: table)で包み、figure は既定で分割不可の
+  // ため、1 ページに収まらない表はあふれた行が描画されずに消える。表のみ
+  // 分割を許可する(継続ページのヘッダ行は table.header の繰り返しで再掲
+  // され、上下のアクセント罫線も分割片ごとに描画される)。
+  show figure.where(kind: table): set block(breakable: true)
 
   // ---- 脚注 ----
   set footnote.entry(separator: thin-rule(width: footnote-separator-width, weight: 0.5pt))

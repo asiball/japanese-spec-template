@@ -15,7 +15,8 @@
 #     単一ファイルと 00-meta.md が対象(表紙・ヘッダに title が必須)
 #   - 章ファイルへのフロントマター混入(pandoc の連結時に後方ファイルが
 #     前方を上書きし、00-meta.md の title 等が消えるため)
-#   - 見出しの手動採番: `# 1. foo` / `## 2) foo` / `# 第1章 foo` / `# 1章 foo`
+#   - 見出しの手動採番: `# 1. foo` / `## 2) foo` / `## 1.1. foo` / `## 1．foo` /
+#     `## (1) foo` / `# 第1章 foo` / `# 1章 foo`
 #     (Typst の自動採番と二重になるため。全ファイルが対象)
 #   - PlantUML 参照の不備: .puml の直接画像参照(変換後の SVG を参照する
 #     規約)、/build/diagrams/<name>.svg 形式(ルート絶対パス)でない図の
@@ -156,17 +157,25 @@ for f in "$@"; do
 		lineno=$((lineno + 1))
 		line=${line%"$CR"}
 
-		# フェンス判定は行頭の空白・引用符号を落としてから行う。CommonMark は
+		# フェンス判定は行頭の引用符号・空白を落としてから行う。CommonMark は
 		# リスト項目や引用の中でもフェンスを開始でき(実際にインデントして
 		# 書かれる)、桁 0 のフェンスしか認識しないと、記法の説明としてフェンス
 		# 内に書いた図参照を実参照と誤検出してビルドを止めてしまう。
+		# ただし空白の字下げは数える: CommonMark で 4 桁以上はインデント
+		# コードブロックでありフェンスの開始・終了にならない(無制限に剥がすと
+		# インデントコード内の ``` をフェンス開始と誤認し、以降の全チェックが
+		# 無言で無効化される)。
 		marker=$line
+		indent=0
 		while :; do
 			case $marker in
-				' '*|"$TAB"*|'>'*) marker=${marker#?} ;;
+				' '*) indent=$((indent + 1)); marker=${marker#?} ;;
+				"$TAB"*) indent=$((indent + 4)); marker=${marker#?} ;;
+				'>'*) indent=0; marker=${marker#?} ;;
 				*) break ;;
 			esac
 		done
+		[ "$indent" -ge 4 ] && marker=""
 
 		case "$marker" in
 			'`'*|'~'*)
@@ -216,11 +225,21 @@ for f in "$@"; do
 			continue
 		fi
 
+		# インデントコードブロック相当(4 桁以上の字下げ)はコードとして扱い、
+		# 見出し・参照のチェック対象にしない(フェンス内と同じ誤検出防止)。
+		if [ "$indent" -ge 4 ]; then
+			continue
+		fi
+
 		case "$line" in
 			'#'*)
 				if printf '%s' "$line" | grep -Eq '^#{1,6} '; then
 					rest=$(printf '%s' "$line" | sed -E 's/^#{1,6} //')
-					if printf '%s' "$rest" | grep -Eq '^[0-9]+[.)] '; then
+					# 「1. 」「2) 」に加え、多階層(1.1.)・全角ピリオド(1．)・
+					# 括弧数字((1) )も手動採番として検出する。全角文字は
+					# C ロケールの grep -E でバイト列として素直に一致する
+					# リテラル・交代のみで書く(? などの量指定子は不可)。
+					if printf '%s' "$rest" | grep -Eq '^([0-9]+(\.[0-9]+)*([.)] |．)|\([0-9]+\) )'; then
 						echo "ERROR: $f:$lineno: 見出しに手動採番が付与されています(自動採番と二重になります): $line"
 						found_error=1
 					# 「第」の有無を「第?」のように ? 一つでまとめて書くと、C ロケールの
@@ -237,9 +256,14 @@ for f in "$@"; do
 		esac
 
 		# --- PlantUML 参照のチェック(1 行に複数の画像参照があってもすべて検査する) ---
-		case "$line" in
+		# インラインコード内の記法説明(`![図](/build/diagrams/x.svg)` 等)を
+		# 実参照と誤検出しないよう、走査前にコードスパンを落とす。
+		scan=$line
+		case "$scan" in
+			*'`'*) scan=$(printf '%s' "$scan" | sed 's/`[^`]*`//g') ;;
+		esac
+		case "$scan" in
 			*']('*)
-				scan=$line
 				while [ "${scan#*']('}" != "$scan" ]; do
 					scan=${scan#*']('}
 					target=${scan%%\)*}
