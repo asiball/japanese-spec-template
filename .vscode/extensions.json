@@ -1,0 +1,11 @@
+{
+	// エディタ内プレビュー用の推奨拡張(README の「エディタ内での Typst
+	// プレビュー」参照)。ビルド自体は Docker で完結するため、いずれも
+	// 必須ではない。
+	"recommendations": [
+		// build/obj/<name>.typ のライブプレビュー(Tinymist)。
+		"myriad-dreamin.tinymist",
+		// assets/diagrams/*.puml のサイドプレビュー。
+		"jebbs.plantuml"
+	]
+}

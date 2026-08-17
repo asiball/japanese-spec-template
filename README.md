@@ -30,6 +30,7 @@ make pdf SRC=docs/my-spec.md
 - [使い方](#使い方)
 - [章別ファイル分割](#章別ファイル分割)
 - [執筆中の自動更新(make watch)](#執筆中の自動更新make-watch)
+- [エディタ内での Typst プレビュー](#エディタ内での-typst-プレビュー)
 - [図の挿入(画像と PlantUML)](#図の挿入画像と-plantuml)
 - [執筆ルール](#執筆ルール)
 - [エスケープハッチ(生 Typst の使い方)](#エスケープハッチ生-typst-の使い方)
@@ -99,6 +100,7 @@ flowchart LR
 │   ├── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(ビルド時に自動実行)
 │   ├── puml2svg.sh                   PlantUML → SVG 変換(ビルド時に自動実行)
 │   └── list-diagram-refs.sh          Markdown が参照する図の列挙(Makefile が変換対象の決定に使用)
+├── .vscode/                          VS Code の推奨拡張と Tinymist の設定(下記「エディタ内での Typst プレビュー」参照)
 ├── .github/workflows/build.yml       CI(PR ごとに lint・lint.sh の回帰テスト・サンプルビルド・docs/ の自動ビルド検証を実行)
 ├── Dockerfile                        ビルド環境(pandoc / typst / plantuml とフォントを固定バージョンで同梱。BUILDING.md 参照)
 ├── .dockerignore                     ビルドコンテキストの除外指定(Dockerfile は COPY を行わないため全除外)
@@ -122,6 +124,7 @@ make pdf SRC=docs/foo           # 章別ファイル分割ディレクトリを�
 make example                    # 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 make pdf-all                    # docs/ 配下のビルド対象を自動発見して全件ビルド
 make watch SRC=docs/foo.md      # 任意の Markdown / ディレクトリを自動リビルド(執筆中の常時起動用。下記「執筆中の自動更新」参照)
+make fonts                      # エディタ内プレビュー用にフォントを .fonts/ へ書き出す(下記「エディタ内での Typst プレビュー」参照)
 make lint                       # docs/ と examples/ の Markdown(単一ファイル+章別ファイル分割)の簡易 lint のみを実行
 make test                       # scripts/lint.sh 自体の回帰テストを実行(原稿の執筆では通常使わない)
 make clean                      # build/ を削除
@@ -201,8 +204,47 @@ make watch SRC=docs/foo         # 章別ファイル分割ディレクトリを�
 
 - Markdown の lint エラーや pandoc の変換エラーが発生しても `make watch` 自体は停止しません。エラーメッセージを表示したうえで監視を継続し、ファイルを修正して保存すると次のポーリングで自動的に再試行します。
 - 終了するときは **Ctrl-C** を押してください。バックグラウンドの `typst watch` プロセスも一緒に終了します。
-- PDF ビューア側の自動リロード(ファイルが更新されたら開いているビューアが再読み込みする機能)は本テンプレートの範囲外で、お使いの PDF ビューアの対応状況に依存します(自動リロードに対応したビューアであれば、`make watch` が生成する `build/<name>.pdf` を開いたままにしておくと更新が反映されます)。
+- PDF ビューア側の自動リロード(ファイルが更新されたら開いているビューアが再読み込みする機能)は本テンプレートの範囲外で、お使いの PDF ビューアの対応状況に依存します(自動リロードに対応したビューアであれば、`make watch` が生成する `build/<name>.pdf` を開いたままにしておくと更新が反映されます)。**Microsoft Edge など自動リロードしないビューアを使っている場合は、PDF を開き直す代わりに下記「エディタ内での Typst プレビュー」を使うと、保存するたびに VS Code 内で仕上がりを確認できます。**
 - 内部実装(`scripts/container-build.sh` の watch モード)は POSIX sh のみで書かれており、`inotifywait` / `fswatch` のような追加ツールには依存しません。
+
+## エディタ内での Typst プレビュー
+
+PDF ビューアを開き直さずに仕上がりを確認したい場合は、VS Code の [Tinymist Typst](https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist) 拡張のライブプレビューを `make watch` と組み合わせます。VS Code の Markdown プレビューと同じ感覚で、原稿を保存するたびにエディタ内のプレビューが更新されます。
+
+`make watch` は原稿を保存するたびに中間生成物 `build/obj/<name>.typ` を再生成します。この `.typ` を Tinymist のプレビューで開いておけば、再生成のたびにプレビューが自動で再描画されます(PDF を経由しません)。
+
+```
+docs/foo.md を保存
+  → make watch:  lint → 図の変換 → pandoc → build/obj/foo.typ を再生成
+  → Tinymist:    .typ の更新を検知して VS Code 内のプレビューを再描画
+```
+
+### 準備(最初の 1 回だけ)
+
+1. VS Code でこのリポジトリのルートをワークスペースとして開く(`/assets/images/...` や `/build/diagrams/...` というルート絶対パスの参照が、ビルドの `--root .` と同じくワークスペースルート基準で解決されるようにするため)。推奨拡張の通知から **Tinymist Typst** をインストールします(`.vscode/extensions.json` に登録済み)。
+2. フォントを書き出します。
+
+   ```sh
+   make fonts
+   ```
+
+   ビルドで使うフォントは Docker イメージ内(`/opt/fonts`)にしかなく、拡張に同梱された Typst からは参照できません。`make fonts` はイメージからフォントを `.fonts/`(git 管理対象外)へ取り出します。`.vscode/settings.json` の `tinymist.fontPaths` がこのディレクトリを指しているため、設定変更は不要です。**書き出す前は和文が代替フォントで表示され、ビルド結果と見た目が一致しません。**
+3. 一度 `make pdf SRC=docs/foo.md`(または `make watch`)を実行して、プレビュー対象の `build/obj/foo.typ` を生成しておきます。
+
+### 使い方
+
+```sh
+make watch SRC=docs/foo.md
+```
+
+を起動したまま、VS Code で `build/obj/foo.typ` を開き、エディタ右上のプレビューボタン(またはコマンドパレットで「Typst Preview」)からプレビューを開始します。プレビューを原稿の隣に並べておけば、`docs/foo.md` を保存するたびに反映されます。
+
+**注意**:
+
+- **成果物の PDF はあくまで `make pdf` / `make watch`(コンテナ内の Typst)が生成するものです**。プレビューは拡張に同梱された Typst でコンパイルされるためバージョンが一致するとは限らず、細部が異なる可能性があります。納品前の最終確認は必ず `build/<name>.pdf` で行ってください(`.vscode/settings.json` では、生成元を一本化するため拡張側の PDF 書き出しを無効にしています)。
+- プレビューに表示されるのは pandoc が生成した `.typ` なので、**編集するのは常に `docs/*.md` 側**です。`build/obj/*.typ` を直接編集しても次の再生成で失われます(同じ理由で拡張側の自動整形も無効にしています)。
+- `template/spec.typ` を編集した場合も、プレビューは自動で追随します(`.typ` が `/template/spec.typ` を import しているため)。
+- フォントを差し替えたとき(`Dockerfile` のフォント導入レイヤーを変更したとき)は、`make fonts` を実行し直してください。
 
 ## 図の挿入(画像と PlantUML)
 

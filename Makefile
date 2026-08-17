@@ -8,6 +8,7 @@
 #   make example                 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 #   make pdf-all                 docs/ 配下のビルド対象を自動発見して全件ビルド
 #   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新」参照。SRC 必須)
+#   make fonts                   エディタ内プレビュー用にフォントを書き出す
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
 #   make clean                   build/ を削除
@@ -24,6 +25,11 @@
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 BUILD      := build
+
+# エディタ内プレビュー(Tinymist)がイメージ内 /opt/fonts と同じフォントを
+# 参照できるようにするための書き出し先(make fonts。.vscode/settings.json の
+# tinymist.fontPaths と対になる)。ビルド自体はこのディレクトリを使わない。
+FONTS      := .fonts
 
 # 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
 # 専用、[0-9][0-9]-*.md が章ファイルでファイル名の辞書順が章順(規約の詳細は
@@ -160,7 +166,7 @@ CONTAINER_ENV := \
 # root 所有で残ると消せなくなるため)。
 DOCKER_RUN := docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work
 
-.PHONY: help pdf example pdf-all docker-build validate watch clean lint lint-src test
+.PHONY: help pdf example pdf-all docker-build validate watch fonts clean lint lint-src test
 
 # 引数なしの `make` は使い方を表示する(既定を pdf にすると SRC 必須の
 # エラーだけが出て、何をすればよいか分からないため)。
@@ -173,6 +179,7 @@ help:
 	@echo "  make example                 同梱サンプル 2 種をビルド"
 	@echo "  make pdf-all                 docs/ 配下を自動発見して全件ビルド"
 	@echo "  make watch SRC=docs/foo.md   執筆中の自動リビルド(Ctrl-C で終了)"
+	@echo "  make fonts                   エディタ内プレビュー用にフォントを書き出す"
 	@echo "  make lint                    docs/ と examples/ の簡易 lint"
 	@echo "  make test                    scripts/lint.sh の回帰テスト"
 	@echo "  make clean                   build/ を削除"
@@ -252,6 +259,17 @@ watch: validate docker-build
 	@mkdir -p "$(BUILD)"
 	@echo "watch: $(SRC) の変更を監視します(Ctrl-C で終了)"
 	$(DOCKER_RUN) --init -it -e WATCH=1 $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
+
+# エディタ内プレビュー(Tinymist)用のフォント書き出し。Tinymist は拡張に
+# 同梱された Typst で .typ をコンパイルするため、イメージ内 /opt/fonts を
+# 参照できない。ビルドと同じ見た目にするにはイメージから取り出す必要がある
+# (ホストへのフォントのインストールは不要にするというテンプレートの方針上、
+# 利用者に手動インストールを求めない)。書き出し先は .gitignore 済み。
+# ライセンス文書もフォントと同じ場所に置く(OFL の再配布条件)。
+fonts: docker-build
+	@mkdir -p "$(FONTS)"
+	$(DOCKER_RUN) $(DOCKER_FULLTAG) sh -c 'cp -R /opt/fonts/. "$(FONTS)/"'
+	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「エディタ内での Typst プレビュー」参照)"
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
 # `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。
