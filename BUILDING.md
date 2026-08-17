@@ -1,6 +1,6 @@
 # BUILDING — ビルド環境の詳細
 
-本書は `template-jp-document` のビルド環境(Docker イメージの構成、バージョン固定、フォント)に関する詳細をまとめたものです。日々のビルドコマンドと執筆ルールは `README.md` を参照してください。
+本書は `template-jp-document` のビルド環境(Docker イメージの構成、バージョン固定、フォント)に関する詳細をまとめたものです。日々のビルドコマンドと執筆ルールは `README.md` を、Markdown に不慣れな利用者向けの手引きは `GETTING-STARTED.md` を参照してください。
 
 ## ビルドの仕組み
 
@@ -14,7 +14,7 @@
 
 | ツール | バージョン | 導入方法 |
 |---|---|---|
-| pandoc | 3.10 | `pandoc/core:3.10` ベースイメージ |
+| pandoc | 3.10 | `pandoc/core:3.10.0.0` ベースイメージ |
 | typst  | 0.15.0 | 公式 GitHub Releases の musl 静的ビルド(sha256 検証) |
 | plantuml | 1.2026.6 | Maven Central の jar(sha256 検証) |
 | フォント | 下記「フォント」節の表 | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
@@ -70,11 +70,11 @@ curl -fsSL "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/<ve
 
 ### ベースイメージ(pandoc/core)の digest 固定
 
-`Dockerfile` は既定で `pandoc/core:3.10` をタグ指定で使用しています。タグはリポジトリ側で再 push されうるため、より厳密な決定性が必要な場合は digest を固定してください。
+`Dockerfile` は既定で `pandoc/core:3.10.0.0` を 4 桁のイミュータブルタグで使用しています(`3.10` のような 3 桁以下の数値タグは rolling で、リポジトリ側から再 push されうるため使わない)。さらに厳密にする場合は digest を固定してください。
 
 ```sh
-docker pull pandoc/core:3.10
-docker inspect --format '{{index .RepoDigests 0}}' pandoc/core:3.10
+docker pull pandoc/core:3.10.0.0
+docker inspect --format '{{index .RepoDigests 0}}' pandoc/core:3.10.0.0
 # 例: pandoc/core@sha256:<digest>
 ```
 
@@ -131,4 +131,5 @@ fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き
 - 本テンプレートは Typst 0.15 系の構文を前提としています。
 - ビルドには Docker が必須です。Docker なしのローカルビルドは非サポートですが、上記の表と同じバージョンのツールとフォントを自前で用意すれば `scripts/container-build.sh` を直接実行して再現できます(README の「ビルド環境の詳細」の参考欄参照)。なお、Ubuntu の apt が提供する pandoc(24.04 時点で 3.1.3)は Typst ライターが古く、このテンプレートが前提とする出力(表キャプション・`table.header`・`{.unnumbered}`・脚注など)に対応していません。
 - イメージの構築時にはネットワークアクセス(Docker Hub・GitHub・Maven Central)が必要です。構築後のビルド実行はオフラインで動作します。
-- `pandoc/core` ベースイメージは既定でタグ(`pandoc/core:3.10`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。
+- `pandoc/core` ベースイメージは既定でイミュータブルタグ(`pandoc/core:3.10.0.0`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。
+- Alpine の apk で導入するパッケージ(特に graphviz。状態遷移図などシーケンス図以外の PlantUML 図のレイアウトエンジン)はバージョン未固定です。イメージを再構築する時期によって図のレイアウトが微妙に変わる可能性があります(構築済みイメージを使い続ける限りは変わりません)。

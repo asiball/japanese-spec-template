@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-このリポジトリで Markdown 仕様書を執筆・ビルドする AI エージェント向けの手引きです。人間向けの詳しい説明は `README.md` を、ビルド環境の詳細は `BUILDING.md` を参照してください。
+このリポジトリで Markdown 仕様書を執筆・ビルドする AI エージェント向けの手引きです。人間向けの詳しい説明は `README.md` を、ビルド環境の詳細は `BUILDING.md` を、Markdown に不慣れな利用者向けの手引きは `GETTING-STARTED.md` を参照してください。
 
 **ディレクトリの役割**: 利用者の原稿は `docs/` に置く。`examples/` は見本(コピー元・実例参照用)であり、原則として書き換えない。
 
@@ -30,7 +30,7 @@ make clean                    # build/ を削除
 
 `build/` 配下のレイアウト: 最終成果物の PDF は `build/` 直下、中間生成物(`.typ` / 改訂履歴の変換 YAML)は `build/obj/`、PlantUML から変換した SVG は `build/diagrams/` に置かれる。
 
-CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples のサンプル 2 種(章別ファイル分割・単一ファイル)をビルド検証し、続けて `make pdf-all` で docs/ 配下の利用者の文書をビルド検証する(テンプレート時点では docs/ が空のため no-op)。
+CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実行で同じ `make pdf` を使い、examples のサンプル 2 種(章別ファイル分割・単一ファイル)をビルド検証し、続けて `make pdf-all` で docs/ 配下の利用者の文書をビルド検証する(テンプレート時点では docs/ が空のため no-op)。`make pdf-all` は `docs/_` 始まりのディレクトリを対象外とし(下書き・共有素材の置き場)、それ以外の規約に合わない `.md`・`docs/<name>.md` と `docs/<name>/` の同名衝突はエラーで停止する。
 
 `SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパス、およびその中の章ファイル名も対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
 
@@ -74,10 +74,11 @@ CI(`.github/workflows/build.yml`)も PR ごとに同じ `make pdf` で examples 
 - **見出しに手動で番号を振らない**。`# はじめに` と書けば `1 はじめに` のように自動採番される。`# 1. はじめに` のように自分で番号を書くと、Typst の自動採番と二重になって `1 1. はじめに` のような表示になってしまう(実際に起きたバグなので特に注意)。
 - 見出しレベル: H1=章(章ごとに自動改ページ)、H2=節、H3=項、H4 以降=番号なし小見出し。
 - **付録など番号を振らない章には `{.unnumbered}` を付ける**(例: `# 付録A: エスケープハッチの例 {.unnumbered}`)。自動採番の対象外になるが、改ページ・目次への収載は維持される。
-- 表・コードブロック・脚注は Markdown 標準の記法をそのまま使う。表の網掛け・罫線・キャプション書式は自動適用される。
+- 表・コードブロック・脚注は Markdown 標準の記法をそのまま使う。表の網掛け・罫線・キャプション書式は自動適用される(キャプション自体は表の直後の行に `: キャプション文` と書く)。`*強調*`(斜体)は和文にイタリックがないためゴシック体で表示される。
+- **相互参照**: 見出しに `{#sec-id}` で ID を付け、本文から `` `@sec-id`{=typst} `` で参照すると「1章」「1.1節」形式の番号付きリンクになる(README の「よく使う生 Typst レシピ」参照)。
 - **図**: 画像ファイル(PNG/JPG/SVG)は `assets/images/` に置き `![キャプション](/assets/images/foo.png){width=70%}` のようにルート絶対パスで参照する。シーケンス図・状態遷移図などは PlantUML ソースを `assets/diagrams/<name>.puml` に置き、**変換後の SVG パスを画像参照する**(`![キャプション](/build/diagrams/<name>.svg){width=75%}`。`<name>` はソースと同名)。SVG への変換はビルドが参照からソースを逆引きして自動で行うため、生成 SVG をコミットしてはいけない(管理対象はソースのみ。`.puml` の直接画像参照は lint がエラーにする)。図中フォント等の共通設定は `template/plantuml.config` に書く。実例: `examples/sample-spec/04-api-spec.md` + `assets/diagrams/reservation-sequence.puml`(シーケンス図)、`examples/sample-spec/03-requirements.md` + `assets/diagrams/reservation-states.puml`(状態遷移図)。
 - 和文中の括弧は全角括弧、英数字のみを囲む場合は半角括弧を使う(コードブロック・インラインコード内は対象外)。
-- **改訂履歴(`revisions`)が長くなったら別ファイルに切り出せる**。推奨は `docs/<name>.revisions.md`(章別ファイル分割の場合は `docs/<name>/revisions.md`)という Markdown パイプ表(列は「版数|日付|作成者|改訂内容」の 4 列固定、1 改訂 = 1 行、セル内に生の `|` は不可)。代替として `docs/<name>.revisions.yaml` / `docs/<name>/revisions.yaml`(トップレベルに `revisions:` 配列)も使える。いずれも置くだけで `Makefile` が自動検出して pandoc の `--metadata-file` に反映する(`examples/wareki-api-spec.md` + `examples/wareki-api-spec.revisions.md` が単一ファイルモードの実例)。`.revisions.md` と `.revisions.yaml` の併存はビルドエラーになる。Pandoc の合成規則上、フロントマター側の `revisions` は `--metadata-file` 側より優先されて上書きされるため、**`revisions` はフロントマター・別ファイルのいずれか 1 箇所にのみ書く**(推奨: `.revisions.md` / `revisions.md`)。詳細は README の「改訂履歴の別ファイル化」節を参照。
+- **改訂履歴(`revisions`)が長くなったら別ファイルに切り出せる**。推奨は `docs/<name>.revisions.md`(章別ファイル分割の場合は `docs/<name>/revisions.md`)という Markdown パイプ表(列は「版数|日付|作成者|改訂内容」の 4 列固定、1 改訂 = 1 行、セル内に生の `|` は不可)。代替として `docs/<name>.revisions.yaml` / `docs/<name>/revisions.yaml`(トップレベルに `revisions:` 配列)も使える。いずれも置くだけで `Makefile` が自動検出して pandoc の `--metadata-file` に反映する(`examples/wareki-api-spec.md` + `examples/wareki-api-spec.revisions.md` が単一ファイルモードの実例)。`.revisions.md` と `.revisions.yaml` の併存はビルドエラーになる。Pandoc の合成規則上、フロントマター側の `revisions` が `--metadata-file` 側を常に上書きするため、**`revisions` はフロントマター・別ファイルのいずれか 1 箇所にのみ書く**(推奨: `.revisions.md` / `revisions.md`)。詳細は README の「改訂履歴の別ファイル化」節を参照。
 
 ## エスケープハッチの判断基準
 

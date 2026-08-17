@@ -8,8 +8,10 @@
 # PlantUML の文字幅計測(fontconfig)の両方から参照する。
 # =============================================================================
 
-# タグ固定(digest 固定が必要な場合は BUILDING.md の手順で PANDOC_IMAGE を上書き)。
-ARG PANDOC_IMAGE=pandoc/core:3.10
+# 4 桁のイミュータブルタグで固定する(pandoc/dockerfiles は 3.10 のような
+# 数値タグを rolling として再 push しうるため、a.b.c.d 形式でのみ実体が
+# 固定される。digest 固定が必要な場合は BUILDING.md の手順で上書き)。
+ARG PANDOC_IMAGE=pandoc/core:3.10.0.0
 FROM ${PANDOC_IMAGE}
 
 # 変更時は TYPST_SHA256_X86_64 / TYPST_SHA256_AARCH64 も差し替える(BUILDING.md 参照)。

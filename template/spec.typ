@@ -45,17 +45,6 @@
 // 表紙ロゴの描画高さ(cover-page で使用。横幅はアスペクト比に応じて自動)。
 #let logo-height = 12mm
 
-// ---- Pandoc 橋渡し用ヘルパー ---------------------------------------------
-// Pandoc テンプレートの変数展開はマークアップ用エスケープ(`_` → `\_` 等)を
-// 含むため、パスとして使う値を文字列リテラルで受けると壊れる。content として
-// 受けてから素のテキストへ戻す(template.typ の logo 橋渡しで使用)。
-#let content-to-string(c) = {
-  if type(c) == str { c } else if c.has("text") { c.text } else if c.has("children") {
-    let s = c.children.map(content-to-string).join("")
-    if s == none { "" } else { s }
-  } else if c.has("body") { content-to-string(c.body) } else { "" }
-}
-
 // ---- 和文組版グリッド ----------------------------------------------------
 // Typst 既定の top-edge(グリフ実測)のままだと、欧文・インラインコード混在行
 // で行送りが変動する。okumuralab/typst-js(MIT-0)の cjkheight(0.88em)に
@@ -67,7 +56,9 @@
 // 内部ユーティリティ
 // =============================================================================
 
-// content を平文文字列に変換する(document() の author 等は str を要求するため)
+// content を平文文字列に変換する(document() の author 等は str を要求するため。
+// template.typ の logo 橋渡しでも使う: Pandoc の変数展開はマークアップ用
+// エスケープ(`_` → `\_` 等)を含むため、パスを文字列リテラルで受けると壊れる)
 #let content-to-string(content) = {
   if type(content) == str {
     content
@@ -244,6 +235,9 @@
   set document(
     title: if title != none { title } else { none },
     author: if author != none { (content-to-string(author),) } else { () },
+    // 既定の auto はビルド時刻を PDF に埋め込み、同一入力でもバイト単位で
+    // 一致しなくなるため明示的に none にする。
+    date: none,
   )
 
   // ---- 基本ページ設定 ----
@@ -274,6 +268,21 @@
 
   // ---- 見出し番号: レベル3まで "1.1.1" ----
   set heading(numbering: "1.1.1")
+
+  // ---- 相互参照 ----
+  // 見出しへの @ラベル 参照を「1章」「1.1節」「1.1.1項」の和文順で表記する
+  // (既定は supplement が先に付く「節 1.1」の英文順で、章・節・項の区別も
+  // ない)。番号なし見出し({.unnumbered})への参照は既定表記のままとする。
+  show ref: it => {
+    let el = it.element
+    if el != none and el.func() == heading and el.numbering != none {
+      let nums = numbering(el.numbering, ..counter(heading).at(el.location()))
+      let unit = if el.level == 1 { "章" } else if el.level == 2 { "節" } else { "項" }
+      link(el.location())[#nums#unit]
+    } else {
+      it
+    }
+  }
 
   // ---- リンク(濃紺・下線なし。Typst のリンクは既定で下線なし) ----
   show link: set text(fill: accent-color)

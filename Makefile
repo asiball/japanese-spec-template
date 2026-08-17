@@ -210,16 +210,29 @@ pdf-all:
 		case "$$f" in \
 			*.revisions.md) continue ;; \
 		esac; \
+		name=$${f#docs/}; name=$${name%.md}; \
+		if [ -d "docs/$$name" ]; then \
+			echo "ERROR: docs/$$name.md と docs/$$name/ が両方存在します。出力が同名(build/$$name.pdf)になり後からビルドした方が前を無言で上書きするため、どちらかの名前を変えてください。" >&2; \
+			exit 1; \
+		fi; \
 		found=1; \
 		$(MAKE) pdf SRC="$$f" || exit 1; \
 	done; \
 	for d in docs/*/; do \
 		[ -d "$$d" ] || continue; \
 		d=$${d%/}; \
+		case "$$d" in \
+			docs/_*) continue ;; \
+		esac; \
 		if [ ! -f "$$d/00-meta.md" ]; then \
 			for cf in "$$d"/[0-9][0-9]-*.md; do \
 				[ -f "$$cf" ] || continue; \
 				echo "ERROR: $$d に 00-meta.md がありません(章ファイルが置かれているため章別ファイル分割と思われます。00-meta.md がないとビルド対象として検出されないため、エラーで停止します。README の「章別ファイル分割」参照)。" >&2; \
+				exit 1; \
+			done; \
+			for mf in "$$d"/*.md; do \
+				[ -f "$$mf" ] || continue; \
+				echo "ERROR: $$d はビルド対象として認識されません($$mf が規約に合いません)。ビルド対象は docs/ 直下の <name>.md か、00-meta.md + 章ファイル([0-9][0-9]-*.md)の章別ファイル分割ディレクトリのみです(無言でビルド対象から漏れるのを防ぐため停止します)。ビルド対象外の作業ファイルは _ 始まりのディレクトリ(例: docs/_drafts/)に置いてください。" >&2; \
 				exit 1; \
 			done; \
 			continue; \
