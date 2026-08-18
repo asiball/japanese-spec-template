@@ -42,6 +42,10 @@
 // 脚注セパレータ罫線の幅(spec-doc の footnote 設定で使用)。
 #let footnote-separator-width = 30%
 
+// 図表(figure)と前後の本文との間隔(spec-doc の figure ショウルールで使用)。
+// 本文の段落間隔(0.85em)のままだと図表が本文に埋もれるため広めに取る。
+#let figure-spacing = 1.6em
+
 // 表紙ロゴの描画高さ(cover-page で使用。横幅はアスペクト比に応じて自動)。
 #let logo-height = 12mm
 
@@ -403,6 +407,10 @@
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: image): set figure.caption(position: bottom)
   show figure.caption: set text(font: font-sans, size: 9pt)
+
+  // 図表と前後の本文との間隔。キャプション(図表タイトル)も figure に
+  // 含まれるため、キャプション側も同じ余白で本文から分離される。
+  show figure: set block(above: figure-spacing, below: figure-spacing)
 
   // Pandoc は表を figure(kind: table)で包み、figure は既定で分割不可の
   // ため、1 ページに収まらない表はあふれた行が描画されずに消える。表のみ
