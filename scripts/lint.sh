@@ -55,10 +55,19 @@ unquote() {
 }
 
 if [ "$#" -eq 0 ]; then
-	set -- docs/*.md examples/*.md
+	# _ 始まりのファイル・ディレクトリは下書き・共有素材の置き場のため
+	# 自動探索から除外する(make pdf-all と同じ規約。ビルド対象外のものを
+	# lint だけが検査して CI を止めないようにする。引数で明示的に渡された
+	# 場合は検査する)。
+	set --
+	for f in docs/*.md examples/*.md; do
+		case "$f" in docs/_*|examples/_*) continue ;; esac
+		set -- "$@" "$f"
+	done
 	for d in docs/*/ examples/*/; do
 		[ -d "$d" ] || continue
 		d=${d%/}
+		case "$d" in docs/_*|examples/_*) continue ;; esac
 		chapters=""
 		for cf in "$d"/[0-9][0-9]-*.md; do
 			[ -f "$cf" ] || continue
@@ -177,13 +186,17 @@ for f in "$@"; do
 		# コードブロックではない。一方リスト外の 4 桁以上はインデントコード
 		# であり、その中の ``` をフェンス開始と誤認すると以降の全チェックが
 		# 無言で無効化される。リスト外の 4 桁以上のみフェンス扱いを止める。
-		if [ "$in_fence" -eq 0 ]; then
+		# 判定の順序が重要: インデントコードの中身はリスト文脈の更新にも
+		# 使わない(コード内の「- 」行でリスト文脈が誤って立つと、直後の
+		# ``` がフェンス扱いされて同じ無効化が起きるため)。
+		if [ "$indent" -ge 4 ] && [ "$list_mode" -eq 0 ]; then
+			marker=""
+		elif [ "$in_fence" -eq 0 ]; then
 			case "$marker" in
 				'- '*|'* '*|'+ '*|[0-9]'. '*|[0-9][0-9]'. '*|[0-9]') '*|[0-9][0-9]') '*) list_mode=1 ;;
 				*) [ "$indent" -eq 0 ] && [ -n "$marker" ] && list_mode=0 ;;
 			esac
 		fi
-		[ "$indent" -ge 4 ] && [ "$list_mode" -eq 0 ] && marker=""
 
 		case "$marker" in
 			'`'*|'~'*)
@@ -247,11 +260,16 @@ for f in "$@"; do
 					# 「第」の有無を「第?」のように ? 一つでまとめて書くと、C ロケールの
 					# grep -E が多バイト文字をバイト単位で解釈して誤動作するため、
 					# 「第N…|N…」の二分岐で書いている。
+					elif printf '%s' "$rest" | grep -Eq '^(０|１|２|３|４|５|６|７|８|９)+(．|\.)'; then
+						echo "ERROR: $f:$lineno: 見出しに手動採番(全角数字)が付与されています(自動採番と二重になります): $line"
+						found_error=1
 					elif printf '%s' "$rest" | grep -Eq '^(第[0-9]+|[0-9]+)(章|節|項)'; then
 						echo "ERROR: $f:$lineno: 見出しに手動採番(第N章/節/項)が付与されています(自動採番と二重になります): $line"
 						found_error=1
 					elif printf '%s' "$rest" | grep -Eq '^[0-9]+(\.[0-9]+)* '; then
 						echo "WARNING: $f:$lineno: 見出しが数字で始まっています(手動採番の可能性があります。バージョン表記などの正当な見出しであれば無視してください): $line"
+					elif printf '%s' "$rest" | grep -Eq '^(０|１|２|３|４|５|６|７|８|９|①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩)'; then
+						echo "WARNING: $f:$lineno: 見出しが全角数字・丸数字で始まっています(手動採番の可能性があります): $line"
 					fi
 				fi
 				;;
@@ -259,10 +277,14 @@ for f in "$@"; do
 
 		# --- PlantUML 参照のチェック(1 行に複数の画像参照があってもすべて検査する) ---
 		# インラインコード内の記法説明(`![図](/build/diagrams/x.svg)` 等)を
-		# 実参照と誤検出しないよう、走査前にコードスパンを落とす。
+		# 実参照と誤検出しないよう、走査前にコードスパンを落とす(`` の 2 連
+		# スパンを先に落としてから ` の 1 連スパンを落とす。CommonMark の
+		# run 長ペアリングの近似であり、地の文の対になっていないバッククォート
+		# が混ざると後続スパンと誤って対にされうるが、その場合の見逃しは
+		# 後段の typst compile が file not found で停止するため無言にはならない)。
 		scan=$line
 		case "$scan" in
-			*'`'*) scan=$(printf '%s' "$scan" | sed 's/`[^`]*`//g') ;;
+			*'`'*) scan=$(printf '%s' "$scan" | sed 's/``[^`]*``//g; s/`[^`]*`//g') ;;
 		esac
 		case "$scan" in
 			*']('*)

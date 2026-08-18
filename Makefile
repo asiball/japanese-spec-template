@@ -212,7 +212,7 @@ pdf-all:
 			docs/_*) continue ;; \
 		esac; \
 		name=$${f#docs/}; name=$${name%.md}; \
-		if [ -d "docs/$$name" ]; then \
+		if [ -f "docs/$$name/00-meta.md" ]; then \
 			echo "ERROR: docs/$$name.md と docs/$$name/ が両方存在します。出力が同名(build/$$name.pdf)になり後からビルドした方が前を無言で上書きするため、どちらかの名前を変えてください。" >&2; \
 			exit 1; \
 		fi; \

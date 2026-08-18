@@ -581,6 +581,65 @@ write docs/indented-code-fence.md <<-'EOF'
 	EOF
 expect_error "見出しに手動採番が付与されています" docs/indented-code-fence.md
 
+new_case "インデントコード内のリスト風の行でフェンス検出が復活しない"
+write docs/indented-code-list.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 手順
+
+	    - 手順のメモ
+	    ```
+	    make pdf
+
+	## 1. 悪い見出し
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/indented-code-list.md
+
+new_case "「## １．見出し」形式(全角数字)はエラー"
+write docs/numbered-fullwidth.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## １．概要
+	EOF
+expect_error "見出しに手動採番(全角数字)が付与されています" docs/numbered-fullwidth.md
+
+new_case "丸数字で始まる見出しは警告のみ"
+write docs/numbered-circled.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## ①概要
+	EOF
+expect_warn "見出しが全角数字・丸数字で始まっています" docs/numbered-circled.md
+
+new_case "2 連バッククォートのスパン内の図参照は検査しない"
+write docs/double-backtick-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 記法の説明
+
+	``![図](/build/diagrams/nonexistent.svg)`` のように書きます。
+	EOF
+expect_ok docs/double-backtick-ref.md
+
+new_case "_ 始まりのファイル・ディレクトリは引数なし探索の対象外"
+write docs/_memo.md <<-'EOF'
+	フロントマターのない下書きメモ。
+	EOF
+write docs/_drafts/10-wip.md <<-'EOF'
+	---
+	title: 章ファイルへの混入(対象外なので検出されない)
+	---
+	EOF
+expect_ok
+
 new_case "ネストしたリスト項目(4 スペース)内の図参照も検査される"
 write docs/nested-list-ref.md <<-'EOF'
 	---

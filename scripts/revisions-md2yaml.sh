@@ -48,13 +48,12 @@ BEGIN { nrows = 0; tlines = 0; seen_sep = 0; err = 0 }
 	sub(/^\|/, "", s)
 	sub(/\|[ \t]*$/, "", s)
 	n = split(s, c, "|")
-	# 区切り行のセルは 3 個以上のダッシュを要求する(データ行の空欄をダッシュ
-	# 1 個で埋める書き方と衝突させないため)。
 	sep = (n > 0)
 	for (i = 1; i <= n; i++) {
-		if (trim(c[i]) !~ /^:?---+:?$/) { sep = 0; break }
+		if (trim(c[i]) !~ /^:?-+:?$/) { sep = 0; break }
 	}
-	# 区切り行として扱うのはヘッダ直後(表の 2 行目まで)に現れた場合のみ。
+	# 区切り行として扱うのはヘッダ直後(表の 2 行目まで)に現れた場合のみ
+	# (それ以降の全セルがダッシュの行は、空欄をダッシュで埋めたデータ行)。
 	# 直前の行(ヘッダ)は保留から捨てる。
 	if (sep && !seen_sep && tlines <= 1) {
 		seen_sep = 1
@@ -62,17 +61,21 @@ BEGIN { nrows = 0; tlines = 0; seen_sep = 0; err = 0 }
 		nrows = 0
 		next
 	}
-	if (n != 4) {
+	# ヘッダ候補(区切り行より前の 1 行目)は列数を検査しない(列名・列数は
+	# 任意)。データ行は 4 列固定。
+	if ((tlines > 0 || seen_sep) && n != 4) {
 		printf "ERROR: %s:%d: 改訂履歴の表の行は 4 列(版数|日付|作成者|改訂内容)である必要があります(%d 列でした)。セル内に生の | は使えません: %s\n", fname, NR, n, t > "/dev/stderr"
 		err = 1
 		exit 1
 	}
 	tlines++
-	nrows++
-	row_v[nrows] = yesc(trim(c[1]))
-	row_d[nrows] = yesc(trim(c[2]))
-	row_a[nrows] = yesc(trim(c[3]))
-	row_c[nrows] = yesc(trim(c[4]))
+	if (n == 4) {
+		nrows++
+		row_v[nrows] = yesc(trim(c[1]))
+		row_d[nrows] = yesc(trim(c[2]))
+		row_a[nrows] = yesc(trim(c[3]))
+		row_c[nrows] = yesc(trim(c[4]))
+	}
 }
 END {
 	if (err) exit 1
