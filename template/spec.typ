@@ -397,6 +397,9 @@
   )
   show table.hline: set line(stroke: 0.6pt + rule-gray)
 
+  // キャプションは「表 1 キャプション文」の形式(Word の図表番号と同じ
+  // 見た目。Typst 既定の「表 1: キャプション文」からコロンを除く)。
+  set figure.caption(separator: h(0.5em))
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: image): set figure.caption(position: bottom)
   show figure.caption: set text(font: font-sans, size: 9pt)
