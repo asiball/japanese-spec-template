@@ -111,7 +111,7 @@ fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き
 2. `fontTools` 等で正しいファミリー名を確認する(`Source Han Code JP` の例のように、見かけと実際の解決名が異なることがあるため、必ず実際にコンパイルして確認すること)。
 3. `template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` を新しいファミリー名に書き換える。PlantUML 図を使っている場合は `template/plantuml.config` の `defaultFontName` もあわせて書き換える(図中テキストも Typst が同じ仕組みでフォント解決するため)。
 4. `make pdf` を実行し、`Typst warning: unknown font family: ...` が出ないことを確認する(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため、`Dockerfile` を変更した時点で自動的に再構築される。PlantUML 図がある場合は図中テキストの描画も確認する)。
-5. エディタ内 Typst プレビュー(../README.md の「エディタ内での Typst プレビュー」節)を使っている場合は、`make fonts` を実行し直して `.fonts/` を新しいフォントで書き出し直す。
+5. エディタ内 Typst プレビュー(../README.md の「執筆中の自動更新とプレビュー」節)を使っている場合は、`make fonts` を実行し直して `.fonts/` を新しいフォントで書き出し直す。
 
 ## ビルドの決定性について
 
@@ -129,7 +129,7 @@ fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き
 ## 既知の制約・注意点
 
 - 本テンプレートは Typst 0.15 系の構文を前提としています。
-- ビルドには Docker が必須です。Docker なしのローカルビルドは非サポートですが、上記の表と同じバージョンのツールとフォントを自前で用意すれば `scripts/container-build.sh` を直接実行して再現できます(../README.md の「ビルド環境の詳細」の参考欄参照)。なお、Ubuntu の apt が提供する pandoc(24.04 時点で 3.1.3)は Typst ライターが古く、このテンプレートが前提とする出力(表キャプション・`table.header`・`{.unnumbered}`・脚注など)に対応していません。
+- ビルドには Docker が必須です。Docker なしのローカルビルドは非サポートですが、上記の表と同じバージョンのツールとフォントを自前で用意すれば `scripts/container-build.sh` に `FONT_DIR=<フォントの場所>` を指定して直接実行し、再現できます。なお、Ubuntu の apt が提供する pandoc(24.04 時点で 3.1.3)は Typst ライターが古く、このテンプレートが前提とする出力(表キャプション・`table.header`・`{.unnumbered}`・脚注など)に対応していません。
 - イメージの構築時にはネットワークアクセス(Docker Hub・GitHub・Maven Central)が必要です。構築後のビルド実行はオフラインで動作します。
 - `pandoc/core` ベースイメージは既定でイミュータブルタグ(`pandoc/core:3.10.0.0`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。
 - Alpine の apk で導入するパッケージ(特に graphviz。状態遷移図などシーケンス図以外の PlantUML 図のレイアウトエンジン)はバージョン未固定です。イメージを再構築する時期によって図のレイアウトが微妙に変わる可能性があります(構築済みイメージを使い続ける限りは変わりません)。

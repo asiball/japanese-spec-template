@@ -84,8 +84,8 @@ RUN set -eu; \
 	rm -rf /tmp/typst.tar.xz /tmp/typst-extract; \
 	apk del curl xz
 
-# PlantUML(Markdown から参照する .puml の SVG 変換に使用。README の「図の
-# 挿入」節参照)。Maven Central の jar はアーキテクチャ非依存・イミュータブル
+# PlantUML(Markdown から参照する .puml の SVG 変換に使用。guides/WRITING.md の
+# 「図の挿入」節参照)。Maven Central の jar はアーキテクチャ非依存・イミュータブル
 # なので、バージョンと sha256 の固定だけで決定的に導入できる。
 ARG PLANTUML_VERSION=1.2026.6
 ARG PLANTUML_SHA256="e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8"

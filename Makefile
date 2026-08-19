@@ -7,7 +7,7 @@
 #   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド(SRC 必須)
 #   make example                 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 #   make pdf-all                 docs/ 配下のビルド対象を自動発見して全件ビルド
-#   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新」参照。SRC 必須)
+#   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新とプレビュー」参照。SRC 必須)
 #   make fonts                   エディタ内プレビュー用にフォントを書き出す
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
@@ -281,7 +281,7 @@ fonts: docker-build
 	@rm -rf "$(FONTS)"
 	@mkdir -p "$(FONTS)"
 	$(DOCKER_RUN) $(DOCKER_FULLTAG) sh -c 'cp -R /opt/fonts/. "$(FONTS)/"'
-	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「エディタ内での Typst プレビュー」参照)"
+	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「執筆中の自動更新とプレビュー」参照)"
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
 # `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。

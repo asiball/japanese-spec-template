@@ -1,6 +1,6 @@
 {
 	// エディタ内プレビュー用の推奨拡張。ビルド自体は Docker で完結するため、
-	// いずれも必須ではない(README の「エディタ内での Typst プレビュー」参照)。
+	// いずれも必須ではない(README の「執筆中の自動更新とプレビュー」参照)。
 	"recommendations": [
 		// build/obj/<name>.typ のライブプレビュー(Tinymist)。
 		"myriad-dreamin.tinymist",

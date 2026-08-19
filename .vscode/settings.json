@@ -1,7 +1,7 @@
 {
 	// Tinymist のエディタ内プレビューを、コンテナ内ビルド(scripts/container-build.sh
 	// の typst 呼び出し)と同じ条件に合わせる設定。詳細は README の
-	// 「エディタ内での Typst プレビュー」参照。
+	// 「執筆中の自動更新とプレビュー」参照。
 
 	// ビルドの --root . 相当。
 	"tinymist.rootPath": "${workspaceFolder}",
