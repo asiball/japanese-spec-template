@@ -2,7 +2,7 @@
 <!--
   typst-highlight.tmTheme
 
-  本テンプレート(template-jp-document)のコードブロック用シンタックス
+  本テンプレート(japanese-spec-template)のコードブロック用シンタックス
   ハイライト配色。既定のハイライトテーマは彩度の高い配色(赤紫・鮮緑等)を
   含み、本テンプレートの青系を基調とした紙面から浮いてしまうため、
   低彩度のパレットで置き換えるために用意した独自テーマ。
@@ -19,7 +19,7 @@
 <plist version="1.0">
 <dict>
 	<key>name</key>
-	<string>template-jp-document Muted</string>
+	<string>japanese-spec-template Muted</string>
 	<key>settings</key>
 	<array>
 		<dict>
