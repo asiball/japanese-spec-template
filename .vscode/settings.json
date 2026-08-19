@@ -1,0 +1,17 @@
+{
+	// Tinymist のエディタ内プレビューを、コンテナ内ビルド(scripts/container-build.sh
+	// の typst 呼び出し)と同じ条件に合わせる設定。詳細は README の
+	// 「エディタ内での Typst プレビュー」参照。
+
+	// ビルドの --root . 相当。
+	"tinymist.rootPath": "${workspaceFolder}",
+	// ビルドの --font-path 相当(`make fonts` の書き出し先)。
+	"tinymist.fontPaths": ["${workspaceFolder}/.fonts"],
+	// ビルドの --ignore-system-fonts 相当。ホスト側の同名フォントが混ざると
+	// プレビューとビルドで見た目がずれる。
+	"tinymist.systemFonts": false,
+	// build/obj/*.typ は pandoc の生成物で、整形しても次の再生成で失われる。
+	"tinymist.formatterMode": "disable",
+	// PDF の生成元は make(コンテナ内の typst)に一本化する。
+	"tinymist.exportPdf": "never"
+}

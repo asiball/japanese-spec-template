@@ -3,7 +3,7 @@
 #
 # ビルドはローカルでも CI でも同じ Docker イメージ内で実行される。CI で毎回
 # 通すことで、次を保証する。
-#   - Dockerfile の固定ツールチェーン(pandoc/core:3.10 ベースイメージ、
+#   - Dockerfile の固定ツールチェーン(pandoc/core:3.10.0.0 ベースイメージ、
 #     Typst / PlantUML / フォントの sha256 検証付き取得)が実際に取得・
 #     構築できること
 #   - 同梱サンプル(章別ファイル分割・単一ファイルの両方式)が lint を通過し
@@ -33,6 +33,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # 週次(月曜 0:00 UTC)でもビルドを検証する。テンプレートは長期間コミット
+    # がない状態が常態のため、依存の取得元消失や期限付きの破壊(Actions の
+    # ランタイム廃止など)を、執筆再開時ではなく発生直後に検知する。
+    # 定期実行ではイメージキャッシュを使わずフル構築する(下記の cache
+    # ステップの条件)。キャッシュを使うと取得元の消失を検知できない。
+    # 注意: GitHub はリポジトリに 60 日間活動がないと schedule を自動停止
+    # する(通知は 1 回のみ)。長期間放置する場合はこの検知も止まる。
+    - cron: '0 0 * * 1'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -46,11 +55,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # 定期実行(schedule)ではキャッシュを使わない: 目的が「依存を実際に
+      # 取得できるか」の検証のため、キャッシュヒットでフル構築がスキップ
+      # されると取得元の消失をいつまでも検知できない。
       - name: Cache Docker image
         id: image-cache
-        uses: actions/cache@v4
+        if: github.event_name != 'schedule'
+        uses: actions/cache@v6
         with:
           path: /tmp/jp-spec-builder.tar
           key: docker-image-${{ hashFiles('Dockerfile') }}
@@ -84,11 +97,11 @@ jobs:
         run: make pdf-all
 
       - name: Save image for cache
-        if: steps.image-cache.outputs.cache-hit != 'true'
+        if: github.event_name != 'schedule' && steps.image-cache.outputs.cache-hit != 'true'
         run: docker save -o /tmp/jp-spec-builder.tar jp-spec-builder
 
       - name: Upload PDFs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pdfs
           path: build/*.pdf

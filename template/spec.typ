@@ -42,6 +42,10 @@
 // 脚注セパレータ罫線の幅(spec-doc の footnote 設定で使用)。
 #let footnote-separator-width = 30%
 
+// 図表(figure)と前後の本文との間隔(spec-doc の figure ショウルールで使用)。
+// 本文の段落間隔(0.85em)のままだと図表が本文に埋もれるため広めに取る。
+#let figure-spacing = 1.6em
+
 // 表紙ロゴの描画高さ(cover-page で使用。横幅はアスペクト比に応じて自動)。
 #let logo-height = 12mm
 
@@ -56,7 +60,9 @@
 // 内部ユーティリティ
 // =============================================================================
 
-// content を平文文字列に変換する(document() の author 等は str を要求するため)
+// content を平文文字列に変換する(document() の author 等は str を要求するため。
+// template.typ の logo 橋渡しでも使う: Pandoc の変数展開はマークアップ用
+// エスケープ(`_` → `\_` 等)を含むため、パスを文字列リテラルで受けると壊れる)
 #let content-to-string(content) = {
   if type(content) == str {
     content
@@ -233,6 +239,9 @@
   set document(
     title: if title != none { title } else { none },
     author: if author != none { (content-to-string(author),) } else { () },
+    // 既定の auto はビルド時刻を PDF に埋め込み、同一入力でもバイト単位で
+    // 一致しなくなるため明示的に none にする。
+    date: none,
   )
 
   // ---- 基本ページ設定 ----
@@ -263,6 +272,28 @@
 
   // ---- 見出し番号: レベル3まで "1.1.1" ----
   set heading(numbering: "1.1.1")
+
+  // ---- 相互参照 ----
+  // 見出しへの @ラベル 参照を「1章」「1.1節」「1.1.1項」の和文順で表記する
+  // (既定は supplement が先に付く「節 1.1」の英文順で、章・節・項の区別も
+  // ない)。番号を表示しない見出し(H4 以降の小見出しと {.unnumbered})は
+  // 見出しテキストのリンクにする(既定挙動は前者に本文に表示されない番号を
+  // 与え、後者を「cannot reference heading without numbering」のコンパイル
+  // エラーにしてしまうため、どちらも自前で描画する)。
+  show ref: it => {
+    let el = it.element
+    if el != none and el.func() == heading {
+      if el.numbering != none and el.level <= 3 {
+        let nums = numbering(el.numbering, ..counter(heading).at(el.location()))
+        let unit = if el.level == 1 { "章" } else if el.level == 2 { "節" } else { "項" }
+        link(el.location())[#nums#unit]
+      } else {
+        link(el.location(), el.body)
+      }
+    } else {
+      it
+    }
+  }
 
   // ---- リンク(濃紺・下線なし。Typst のリンクは既定で下線なし) ----
   show link: set text(fill: accent-color)
@@ -370,9 +401,25 @@
   )
   show table.hline: set line(stroke: 0.6pt + rule-gray)
 
+  // キャプションは「表 1 キャプション文」の形式(Word の図表番号と同じ
+  // 見た目。Typst 既定の「表 1: キャプション文」からコロンを除く)。
+  set figure.caption(separator: h(0.5em))
   show figure.where(kind: table): set figure.caption(position: top)
   show figure.where(kind: image): set figure.caption(position: bottom)
   show figure.caption: set text(font: font-sans, size: 9pt)
+
+  // 図表と前後の本文との間隔。キャプション(図表タイトル)も figure に
+  // 含まれるため、キャプション側も同じ余白で本文から分離される。
+  show figure: set block(above: figure-spacing, below: figure-spacing)
+
+  // Pandoc は表を figure(kind: table)で包み、figure は既定で分割不可の
+  // ため、1 ページに収まらない表はあふれた行が描画されずに消える。表のみ
+  // 分割を許可する(継続ページのヘッダ行は table.header の繰り返しで再掲
+  // され、上下のアクセント罫線も分割片ごとに描画される)。
+  show figure.where(kind: table): set block(breakable: true)
+  // 分割位置がキャプション(表は position: top)の直後に来ると、キャプション
+  // だけが前ページ末尾に孤立するため、キャプションを直後の表本体に結合する。
+  show figure.caption.where(position: top): it => block(sticky: true, it)
 
   // ---- 脚注 ----
   set footnote.entry(separator: thin-rule(width: footnote-separator-width, weight: 0.5pt))

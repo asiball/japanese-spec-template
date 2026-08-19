@@ -346,6 +346,36 @@ write docs/chapter-style2.md <<-'EOF'
 	EOF
 expect_error "手動採番(第N章/節/項)" docs/chapter-style2.md
 
+new_case "「## 1.1. 見出し」形式(多階層採番)はエラー"
+write docs/numbered-multi.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## 1.1. 概要
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/numbered-multi.md
+
+new_case "「## (1) 見出し」形式(括弧数字)はエラー"
+write docs/numbered-paren.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## (1) 概要
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/numbered-paren.md
+
+new_case "「## 1．見出し」形式(全角ピリオド)はエラー"
+write docs/numbered-zenkaku.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## 1．概要
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/numbered-zenkaku.md
+
 new_case "数字で始まる見出しは警告のみ"
 write docs/version-heading.md <<-'EOF'
 	---
@@ -535,6 +565,119 @@ write docs/list-fenced-closed.md <<-'EOF'
 	![実参照](/build/diagrams/example.svg)
 	EOF
 expect_error "対応する PlantUML ソースが存在しません" docs/list-fenced-closed.md
+
+new_case "インデントコードブロック内のフェンス風の行で以降のチェックが無効化されない"
+write docs/indented-code-fence.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 手順
+
+	    ```sh
+	    make pdf
+
+	## 1. 悪い見出し
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/indented-code-fence.md
+
+new_case "インデントコード内のリスト風の行でフェンス検出が復活しない"
+write docs/indented-code-list.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 手順
+
+	    - 手順のメモ
+	    ```
+	    make pdf
+
+	## 1. 悪い見出し
+	EOF
+expect_error "見出しに手動採番が付与されています" docs/indented-code-list.md
+
+new_case "「## １．見出し」形式(全角数字)はエラー"
+write docs/numbered-fullwidth.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## １．概要
+	EOF
+expect_error "見出しに手動採番(全角数字)が付与されています" docs/numbered-fullwidth.md
+
+new_case "丸数字で始まる見出しは警告のみ"
+write docs/numbered-circled.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	## ①概要
+	EOF
+expect_warn "見出しが全角数字・丸数字で始まっています" docs/numbered-circled.md
+
+new_case "2 連バッククォートのスパン内の図参照は検査しない"
+write docs/double-backtick-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 記法の説明
+
+	``![図](/build/diagrams/nonexistent.svg)`` のように書きます。
+	EOF
+expect_ok docs/double-backtick-ref.md
+
+new_case "_ 始まりのファイル・ディレクトリは引数なし探索の対象外"
+write docs/_memo.md <<-'EOF'
+	フロントマターのない下書きメモ。
+	EOF
+write docs/_drafts/10-wip.md <<-'EOF'
+	---
+	title: 章ファイルへの混入(対象外なので検出されない)
+	---
+	EOF
+expect_ok
+
+new_case "ネストしたリスト項目(4 スペース)内の図参照も検査される"
+write docs/nested-list-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 構成
+
+	- 外側の項目
+	  - 内側の項目:
+	    ![図](/build/diagrams/nonexistent.svg)
+	EOF
+expect_error "対応する PlantUML ソースが存在しません" docs/nested-list-ref.md
+
+new_case "リスト項目の 4 スペース継続行の画像参照も検査される"
+write docs/list-continuation-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 構成
+
+	- 箇条書きの項目です。
+	    ![存在しない画像](/assets/images/nonexistent.png)
+	EOF
+expect_error "参照先のファイルが存在しません" docs/list-continuation-ref.md
+
+new_case "インラインコード内の図参照は検査しない"
+write docs/inline-code-ref.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# 記法の説明
+
+	図は `![キャプション](/build/diagrams/nonexistent.svg)` のように書きます。
+	EOF
+expect_ok docs/inline-code-ref.md
 
 # --- assets 配下の参照先 ----------------------------------------------------
 

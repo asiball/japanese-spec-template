@@ -8,6 +8,7 @@
 #   make example                 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 #   make pdf-all                 docs/ 配下のビルド対象を自動発見して全件ビルド
 #   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新」参照。SRC 必須)
+#   make fonts                   エディタ内プレビュー用にフォントを書き出す
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
 #   make clean                   build/ を削除
@@ -24,6 +25,10 @@
 # 末尾スラッシュを正規化する(コマンドライン指定値の上書きには override が必要)。
 override SRC := $(patsubst %/,%,$(SRC))
 BUILD      := build
+
+# make fonts の書き出し先(.vscode/settings.json の tinymist.fontPaths と対。
+# レシピで rm -rf するためコマンドラインからの上書きを override で禁止する)。
+override FONTS := .fonts
 
 # 章別ファイル分割(SRC がディレクトリの場合)。00-meta.md がフロントマター
 # 専用、[0-9][0-9]-*.md が章ファイルでファイル名の辞書順が章順(規約の詳細は
@@ -160,7 +165,7 @@ CONTAINER_ENV := \
 # root 所有で残ると消せなくなるため)。
 DOCKER_RUN := docker run --rm --user $$(id -u):$$(id -g) -v "$(CURDIR)":/work -w /work
 
-.PHONY: help pdf example pdf-all docker-build validate watch clean lint lint-src test
+.PHONY: help pdf example pdf-all docker-build validate watch fonts clean lint lint-src test
 
 # 引数なしの `make` は使い方を表示する(既定を pdf にすると SRC 必須の
 # エラーだけが出て、何をすればよいか分からないため)。
@@ -173,6 +178,7 @@ help:
 	@echo "  make example                 同梱サンプル 2 種をビルド"
 	@echo "  make pdf-all                 docs/ 配下を自動発見して全件ビルド"
 	@echo "  make watch SRC=docs/foo.md   執筆中の自動リビルド(Ctrl-C で終了)"
+	@echo "  make fonts                   エディタ内プレビュー用にフォントを書き出す"
 	@echo "  make lint                    docs/ と examples/ の簡易 lint"
 	@echo "  make test                    scripts/lint.sh の回帰テスト"
 	@echo "  make clean                   build/ を削除"
@@ -203,17 +209,31 @@ pdf-all:
 		[ -f "$$f" ] || continue; \
 		case "$$f" in \
 			*.revisions.md) continue ;; \
+			docs/_*) continue ;; \
 		esac; \
+		name=$${f#docs/}; name=$${name%.md}; \
+		if [ -f "docs/$$name/00-meta.md" ]; then \
+			echo "ERROR: docs/$$name.md と docs/$$name/ が両方存在します。出力が同名(build/$$name.pdf)になり後からビルドした方が前を無言で上書きするため、どちらかの名前を変えてください。" >&2; \
+			exit 1; \
+		fi; \
 		found=1; \
 		$(MAKE) pdf SRC="$$f" || exit 1; \
 	done; \
 	for d in docs/*/; do \
 		[ -d "$$d" ] || continue; \
 		d=$${d%/}; \
+		case "$$d" in \
+			docs/_*) continue ;; \
+		esac; \
 		if [ ! -f "$$d/00-meta.md" ]; then \
 			for cf in "$$d"/[0-9][0-9]-*.md; do \
 				[ -f "$$cf" ] || continue; \
 				echo "ERROR: $$d に 00-meta.md がありません(章ファイルが置かれているため章別ファイル分割と思われます。00-meta.md がないとビルド対象として検出されないため、エラーで停止します。README の「章別ファイル分割」参照)。" >&2; \
+				exit 1; \
+			done; \
+			for mf in "$$d"/*.md; do \
+				[ -f "$$mf" ] || continue; \
+				echo "ERROR: $$d はビルド対象として認識されません($$mf が規約に合いません)。ビルド対象は docs/ 直下の <name>.md か、00-meta.md + 章ファイル([0-9][0-9]-*.md)の章別ファイル分割ディレクトリのみです(無言でビルド対象から漏れるのを防ぐため停止します)。ビルド対象外の作業ファイルは _ 始まりのディレクトリ(例: docs/_drafts/)に置いてください。" >&2; \
 				exit 1; \
 			done; \
 			continue; \
@@ -252,6 +272,16 @@ watch: validate docker-build
 	@mkdir -p "$(BUILD)"
 	@echo "watch: $(SRC) の変更を監視します(Ctrl-C で終了)"
 	$(DOCKER_RUN) --init -it -e WATCH=1 $(CONTAINER_ENV) $(DOCKER_FULLTAG) sh scripts/container-build.sh
+
+# エディタ内プレビュー(Tinymist)用のフォント書き出し。Tinymist は拡張同梱の
+# Typst で .typ をコンパイルするため、イメージ内 /opt/fonts を参照できない。
+# 書き出し先は毎回作り直す(cp の上書きだけでは差し替え前の旧フォントが残り、
+# プレビューだけ古いファミリー名を解決できてしまうため)。
+fonts: docker-build
+	@rm -rf "$(FONTS)"
+	@mkdir -p "$(FONTS)"
+	$(DOCKER_RUN) $(DOCKER_FULLTAG) sh -c 'cp -R /opt/fonts/. "$(FONTS)/"'
+	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「エディタ内での Typst プレビュー」参照)"
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
 # `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。

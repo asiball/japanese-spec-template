@@ -4,7 +4,9 @@ Markdown で構造だけを書き、体裁の作り込みは Typst テーマに�
 
 ## クイックスタート
 
-Docker が使える環境なら、追加のインストールなしで同梱サンプルをビルドできます(初回はビルド環境の構築で数分かかります。2 回目以降はキャッシュが効きます)。
+必要なのは **Docker と GNU make** の 2 つだけです(Docker 本体の導入は [公式ドキュメント](https://docs.docker.com/get-started/get-docker/)参照)。Linux / macOS で動作します。Windows では WSL2 上での利用を想定しています(Windows 標準では make が入っていないため。WSL2 の Ubuntu なら `sudo apt install make` で導入できます)。
+
+この 2 つが使える環境なら、追加のインストールなしで同梱サンプルをビルドできます(初回はビルド環境の構築で数分かかります。2 回目以降はキャッシュが効きます)。
 
 ```sh
 make example      # 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド → build/*.pdf
@@ -30,6 +32,7 @@ make pdf SRC=docs/my-spec.md
 - [使い方](#使い方)
 - [章別ファイル分割](#章別ファイル分割)
 - [執筆中の自動更新(make watch)](#執筆中の自動更新make-watch)
+- [エディタ内での Typst プレビュー](#エディタ内での-typst-プレビュー)
 - [図の挿入(画像と PlantUML)](#図の挿入画像と-plantuml)
 - [執筆ルール](#執筆ルール)
 - [エスケープハッチ(生 Typst の使い方)](#エスケープハッチ生-typst-の使い方)
@@ -99,6 +102,7 @@ flowchart LR
 │   ├── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(ビルド時に自動実行)
 │   ├── puml2svg.sh                   PlantUML → SVG 変換(ビルド時に自動実行)
 │   └── list-diagram-refs.sh          Markdown が参照する図の列挙(Makefile が変換対象の決定に使用)
+├── .vscode/                          VS Code の推奨拡張と Tinymist の設定(任意。下記「エディタ内での Typst プレビュー」参照)
 ├── .github/workflows/build.yml       CI(PR ごとに lint・lint.sh の回帰テスト・サンプルビルド・docs/ の自動ビルド検証を実行)
 ├── Dockerfile                        ビルド環境(pandoc / typst / plantuml とフォントを固定バージョンで同梱。BUILDING.md 参照)
 ├── .dockerignore                     ビルドコンテキストの除外指定(Dockerfile は COPY を行わないため全除外)
@@ -110,9 +114,21 @@ flowchart LR
 └── LICENSE                           ライセンス(MIT。「ライセンス」節を参照)
 ```
 
-`docs/` が利用者の原稿置き場、`examples/` がコピー元・参照用の見本です。`examples/` 配下は README・CLAUDE.md から実例として参照されているため、書き換えずに残しておくことを推奨します(サンプルが不要になったら削除しても、テンプレートの動作自体には影響しません)。
+`docs/` が利用者の原稿置き場、`examples/` がコピー元・参照用の見本です。`examples/` 配下は README・CLAUDE.md から実例として参照されているため、書き換えずに残しておくことを推奨します(サンプルを削除する場合は、`Makefile` の `example` ターゲットと CI(`.github/workflows/build.yml`)のサンプルビルド 2 ステップが `examples/` を直接参照しているため、あわせて削除してください。残したまま `examples/` だけ消すと `make example` と CI が失敗します)。
 
-`docs/` に文書を置けば、設定変更なしで PR ごとに CI(`make pdf-all`)がビルド検証し、生成された PDF をワークフローのアーティファクトから取得できます。
+`docs/` に文書を置けば、設定変更なしで CI(`make pdf-all`。PR・main への push・週次の定期実行で起動)がビルド検証し、生成された PDF をワークフローのアーティファクトから取得できます。ビルド対象外の作業ファイル(下書き・共有素材など)は `_` 始まりの名前(例: `docs/_drafts/`、`docs/_memo.md`)にすると `make pdf-all` の対象外になります(それ以外の規約に合わない `.md` は、無言でビルド対象から漏れるのを防ぐためエラーで停止します)。
+
+### テンプレート本体の更新の取り込み
+
+`docs/`(原稿)と `assets/`(図版)以外 — `template/` / `scripts/` / `Makefile` / `Dockerfile` / `.github/` — は、利用者が原則編集しない共通基盤です。このテンプレートを複製して書き始めた後にテンプレート本体側のバグ修正・改善を取り込みたい場合は、基盤ファイルだけを上書き取得します。
+
+```sh
+git remote add upstream <テンプレートリポジトリの URL>   # 最初の 1 回だけ
+git fetch upstream
+git checkout upstream/main -- template/ scripts/ Makefile Dockerfile .github/ BUILDING.md
+```
+
+`template/spec.typ` を自分でカスタマイズしている場合は上書きされるため、先に差分を確認してから取り込んでください。
 
 ## 使い方
 
@@ -122,6 +138,7 @@ make pdf SRC=docs/foo           # 章別ファイル分割ディレクトリを�
 make example                    # 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 make pdf-all                    # docs/ 配下のビルド対象を自動発見して全件ビルド
 make watch SRC=docs/foo.md      # 任意の Markdown / ディレクトリを自動リビルド(執筆中の常時起動用。下記「執筆中の自動更新」参照)
+make fonts                      # エディタ内プレビュー用にフォントを .fonts/ へ書き出す(下記「エディタ内での Typst プレビュー」参照)
 make lint                       # docs/ と examples/ の Markdown(単一ファイル+章別ファイル分割)の簡易 lint のみを実行
 make test                       # scripts/lint.sh 自体の回帰テストを実行(原稿の執筆では通常使わない)
 make clean                      # build/ を削除
@@ -134,7 +151,7 @@ make help                       # 上記コマンド一覧を表示(引数なし
 
 1. `SRC` の存在確認(章別ファイル分割の場合は `00-meta.md` と章ファイルの有無、参照されている `.puml` の有無)と改訂履歴ファイルの併存チェックを行う(イメージ構築より先に、安価な検証でエラー停止できるようにしている)。続けて Docker イメージを用意する(未構築・ツールチェーン変更時のみ実体の構築が走る)。
 2. `scripts/lint.sh` でビルド対象の Markdown を簡易チェック(`make lint` 単体は docs/ と examples/ の `*.md` 全件 + 章別ファイル分割ディレクトリすべてが対象。改訂履歴ファイル `*.revisions.md` / `*.revisions.yaml` / `revisions.md` / `revisions.yaml` は仕様書本文ではないため対象外)。行末が CRLF(Windows のエディタが保存する改行)の原稿もそのまま検査できます。
-   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` のような「番号+ドット/括弧+空白」形式、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」形式)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に 00-meta.md 以外の章ファイルへ YAML フロントマターが混入していること、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式(ルート絶対パス)以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)、`/assets/` 配下の参照先ファイル・フロントマターの `logo:` が指す画像の不存在。
+   - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` / `## 1.1. foo` / `## 1．foo` / `## (1) foo` のような「番号+ドット/括弧」形式、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」形式)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に 00-meta.md 以外の章ファイルへ YAML フロントマターが混入していること、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式(ルート絶対パス)以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)、`/assets/` 配下の参照先ファイル・フロントマターの `logo:` が指す画像の不存在。
    - **警告(ビルド継続)**: 見出しが数字で始まる(`## 2.5 系` のようなバージョン表記など、上記エラーパターンには一致しないが手動採番の疑いがあるケース)、生 Typst(` ```{=typst} `)ブロック内の装飾コード検出、章別ファイル分割時に同一ディレクトリ内の複数章ファイルで脚注定義 ID(`[^id]:`)が重複していること。
 3. ビルド対象の Markdown が参照している PlantUML 変換図(`/build/diagrams/*.svg`)に対応するソース(`assets/diagrams/<name>.puml`)を `scripts/puml2svg.sh` で変換する(変更されたものだけを再変換。図を参照していない文書では何もしない)。
 4. `pandoc --from markdown --to typst --standalone --template template/template.typ` で Markdown を Typst ソースに変換(`build/obj/<name>.typ` に出力)。章別ファイル分割の場合は 00-meta.md を含む章ファイル一覧(ファイル名の辞書順)を複数の入力として pandoc に渡す(pandoc は複数入力ファイルを連結して 1 文書として処理する)。改訂履歴を別ファイル化している場合は、`revisions.md`(または `<name>.revisions.md`)を YAML に変換したうえで(YAML 方式ならそのまま)`--metadata-file` も付与される(下記「改訂履歴の別ファイル化」参照)。
@@ -201,8 +218,29 @@ make watch SRC=docs/foo         # 章別ファイル分割ディレクトリを�
 
 - Markdown の lint エラーや pandoc の変換エラーが発生しても `make watch` 自体は停止しません。エラーメッセージを表示したうえで監視を継続し、ファイルを修正して保存すると次のポーリングで自動的に再試行します。
 - 終了するときは **Ctrl-C** を押してください。バックグラウンドの `typst watch` プロセスも一緒に終了します。
-- PDF ビューア側の自動リロード(ファイルが更新されたら開いているビューアが再読み込みする機能)は本テンプレートの範囲外で、お使いの PDF ビューアの対応状況に依存します(自動リロードに対応したビューアであれば、`make watch` が生成する `build/<name>.pdf` を開いたままにしておくと更新が反映されます)。
+- PDF ビューア側の自動リロード(ファイルが更新されたら開いているビューアが再読み込みする機能)は本テンプレートの範囲外で、お使いの PDF ビューアの対応状況に依存します(自動リロードに対応したビューアであれば、`make watch` が生成する `build/<name>.pdf` を開いたままにしておくと更新が反映されます)。**Microsoft Edge など自動リロードしないビューアを使っている場合は、PDF を開き直す代わりに下記「エディタ内での Typst プレビュー」を使うと、保存するたびに VS Code 内で仕上がりを確認できます。**
 - 内部実装(`scripts/container-build.sh` の watch モード)は POSIX sh のみで書かれており、`inotifywait` / `fswatch` のような追加ツールには依存しません。
+
+## エディタ内での Typst プレビュー
+
+PDF ビューアを開き直さずに仕上がりを確認したい場合は、VS Code の [Tinymist Typst](https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist) 拡張のライブプレビューを `make watch` と組み合わせます。`make watch` は原稿を保存するたびに中間生成物 `build/obj/<name>.typ` を再生成するので、この `.typ` を Tinymist のプレビューで開いておけば、保存のたびにエディタ内のプレビューが再描画されます(PDF を経由しません)。
+
+### 準備(最初の 1 回だけ)
+
+1. VS Code でこのリポジトリのルートをワークスペースとして開きます(`/assets/images/...` などのルート絶対パスの参照が、ビルドの `--root .` と同じくワークスペースルート基準で解決されるようにするためです)。
+2. `make fonts` を実行してフォントを書き出します。ビルドで使うフォントは Docker イメージ内(`/opt/fonts`)にしかなく、拡張に同梱された Typst からは参照できないため、イメージから `.fonts/`(git 管理対象外)へ取り出します。`.vscode/settings.json` の `tinymist.fontPaths` がこのディレクトリを指しているため、設定変更は不要です。**書き出す前は和文が代替フォントで表示され、ビルド結果と見た目が一致しません。**
+3. 推奨拡張の通知から **Tinymist Typst** をインストールします(`.vscode/extensions.json` に登録済み)。
+
+### 使い方
+
+`make watch SRC=docs/foo.md` を起動したままにします。プレビュー対象の `.typ` の名前は `SRC` から決まり、初回ビルドで生成されます(`docs/foo.md` → `build/obj/foo.typ`、章別ファイル分割 `docs/my-spec` → `build/obj/my-spec.typ`)。この `.typ` を VS Code で開き、エディタ右上のプレビューアイコン(またはコマンドパレットで「Typst Preview」)からプレビューを開始して、原稿の隣に並べておきます。保存から反映までは数秒かかります(`make watch` が 1 秒間隔のポーリングで pandoc を再実行するため)。
+
+**注意**:
+
+- **成果物の PDF はあくまで `make pdf` / `make watch`(コンテナ内の Typst)が生成するものです**。プレビューは拡張に同梱された Typst でコンパイルされるためバージョンが一致するとは限らず、細部が異なる可能性があります。納品前の最終確認は必ず `build/<name>.pdf` で行ってください。
+- プレビューに表示されるのは pandoc が生成した `.typ` なので、**編集するのは常に `docs/*.md` 側**です。`build/obj/*.typ` を直接編集しても次の再生成で失われます。
+- **プレビューが更新されないときは `make watch` のターミナルを確認してください**。lint や pandoc がエラーになると `.typ` が再生成されず、プレビューは古い内容のまま変化しません。
+- フォントを差し替えたとき(`Dockerfile` のフォント導入レイヤーを変更したとき)は、`make fonts` を実行し直してください。
 
 ## 図の挿入(画像と PlantUML)
 
@@ -231,7 +269,7 @@ PlantUML で書ける図は、**ソース(`.puml`)だけを Git 管理し、SVG 
 
 運用上のポイント:
 
-- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml)による `.puml` のサイドプレビューが便利です。
+- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml。`.vscode/extensions.json` に推奨拡張として登録済み)による `.puml` のサイドプレビューが便利です。
 - **図中テキストのフォントは本文と同じフォント(Source Han Sans JP)に統一されます**。`template/plantuml.config` が全図に共通適用されるためで、SVG 内のテキストは Typst がイメージ内のフォント(`/opt/fonts`)から解決して描画します。配色(参加者・状態・グループ枠の背景色や罫線色など)も本文の紙面テーマ(`template/spec.typ` の配色)に統一されます。図の見た目に関する共通設定を増やしたい場合もこのファイルに書きます(個々の図固有の設定は各 `.puml` に書いてかまいません)。
 - **参照は `/build/diagrams/<name>.svg` 形式(ルート絶対パス)で書いてください**。`.puml` の直接参照・相対パス参照・対応する `.puml` が存在しない参照は、`scripts/lint.sh` がエラーでビルドを停止します。
 - **PlantUML・Graphviz のインストールは不要です**。ビルドに使う Docker イメージに固定バージョンが同梱されています(バージョン・チェックサム検証は [BUILDING.md](BUILDING.md) 参照)。
@@ -355,7 +393,56 @@ revisions:
 使ってよい場面の例:
 
 - 表のセル結合(`table.cell(colspan: ..., rowspan: ...)`)
+- 相互参照・改ページ・横向きページ(下記レシピ)
 - Markdown の表現力を超える複雑なレイアウト
+
+### よく使う生 Typst レシピ
+
+Typst の構文を知らなくても、次の 3 つはそのまま貼って使えます。
+
+**相互参照(「1.1節を参照」)** — 参照したい見出しに ID を付け、本文からインラインの生 Typst で参照します。「1章」「1.1節」「1.1.1項」の形の番号付きリンクになり、番号は章の増減に自動で追随します。番号を表示しない見出し(H4 以降の小見出しと `{.unnumbered}` を付けた付録など)を参照した場合は、番号の代わりに見出しテキストのリンクになります。
+
+```markdown
+## 用語の定義 {#sec-terms}
+
+詳細は `@sec-terms`{=typst} を参照してください。
+```
+
+図・表も同じ書き方で参照できます(「図 1」「表 1」の番号付きリンクになります)。図は画像参照の属性に、表はキャプション行の末尾に ID を付けます。
+
+```markdown
+![処理の流れ](/build/diagrams/flow.svg){#fig-flow width=70%}
+
+| ID | 内容 |
+|:-:|:--|
+| 1 | ... |
+
+: 要件一覧 {#tbl-req}
+
+処理の流れを `@fig-flow`{=typst} に、要件を `@tbl-req`{=typst} に示す。
+```
+
+**改ページ** — 章の先頭は自動で改ページされますが、章の途中で任意に改ページしたい場合に使います。
+
+````markdown
+```{=typst}
+#pagebreak()
+```
+````
+
+**横向きページ(横長の表)** — 列数が多く縦のままでは読めない表を、そのページだけ横向きにして置きます(ヘッダ・フッタ・ページ番号は維持され、直前で自動的に改ページされます)。
+
+````markdown
+```{=typst}
+#page(flipped: true)[
+  #table(
+    columns: 4,
+    table.header([項目], [値1], [値2], [値3]),
+    [データ], [A], [B], [C],
+  )
+]
+```
+````
 
 **乱用しない**でください。見た目を整えるためだけに生 Typst を使うのは避け、まずは Markdown 標準の記法と `spec.typ` 側の自動スタイリングで表現できないか検討してください。
 
