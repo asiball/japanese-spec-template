@@ -1,135 +1,123 @@
 # BUILDING — ビルド環境の詳細
 
-本書は `template-jp-document` のビルド環境(Docker イメージの構成、バージョン固定、フォント)に関する詳細をまとめたものです。日々のビルドコマンドは [README](../README.md) を、執筆ルール(記法)は [WRITING.md](WRITING.md) を、Markdown に不慣れな利用者向けの手引きは [GETTING-STARTED.md](GETTING-STARTED.md) を参照してください。
+ビルド環境を保守する開発者向けの文書です。ツールチェーンの固定バージョン、チェックサム検証の仕組み、フォントの差し替え手順をまとめています。執筆ルールは [WRITING.md](WRITING.md) を、全体像は [README](../README.md) を参照してください。
 
 ## ビルドの仕組み
 
-すべてのビルド(`make pdf` / `make watch`)は Docker コンテナ内で実行されます。必要なのは Docker と make のみで、pandoc / typst / plantuml / フォントをローカルへインストールする必要はありません。イメージは初回の `make pdf` で自動構築されます。`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容(+検証系オーバーライド)から自動導出される内容ハッシュのため、ツールチェーンを変更した場合も手動でバンプする必要はなく、変更後の初回ビルドで自動的に別タグとして再構築されます(タグが変わらない限り、既存イメージが再利用され再構築はスキップされます)。
+ビルドはすべて Docker コンテナ内で実行されます。ホストに必要なのは Docker と GNU make だけで、pandoc / typst / plantuml とフォントは `Dockerfile` が固定バージョン+チェックサム検証でイメージに焼き込みます。
 
-`docker run` には `--user $(id -u):$(id -g)` を付与しているため、`build/` 配下に生成されるファイルはホスト側の実行ユーザー所有になります(コンテナ内で root 所有になる問題を避けるため)。
+- `Makefile` の `DOCKER_TAG` は `Dockerfile` の内容(+検証系オーバーライド)から自動導出される内容ハッシュです。`Dockerfile` を変更すると自動的に別タグになり、次回ビルドで再構築が走ります。**手動のバージョンバンプは不要**です。
+- `docker run` は `--user $(id -u):$(id -g)` で実行されます。`build/` 配下の生成物がホストユーザー所有になり、root 所有で消せなくなる事故を防ぎます。
+- `Makefile` がビルド対象の導出と検証を行い、ビルド本体はコンテナ内の `scripts/container-build.sh` が担います。
 
-## 固定バージョン
+### ビルドの流れと build/ のレイアウト
 
-イメージに導入されるツールチェーンは次のとおりです(`Dockerfile` で固定)。
+`make pdf` はコンテナ内で次の順に実行されます。
 
-| ツール | バージョン | 導入方法 |
-|---|---|---|
-| pandoc | 3.10 | `pandoc/core:3.10.0.0` ベースイメージ |
-| typst  | 0.15.0 | 公式 GitHub Releases の musl 静的ビルド(sha256 検証) |
-| plantuml | 1.2026.6 | Maven Central の jar(sha256 検証) |
-| フォント | 下記「フォント」節の表 | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
+1. `scripts/lint.sh` によるビルド対象 Markdown の簡易チェック。
+2. 改訂履歴の別ファイルがあれば変換(`revisions.md` は `scripts/revisions-md2yaml.sh` で YAML へ)。
+3. 参照されている PlantUML 図を `scripts/puml2svg.sh` で SVG へ変換(`-tsvg -failfast2 -config template/plantuml.config -pipe`。mtime 比較で変更分のみ。参照の抽出はコードフェンス除外付きの `scripts/list-diagram-refs.sh`)。
+4. pandoc で Markdown → Typst ソースへ変換(`--template template/template.typ`)。
+5. `typst compile --root . --font-path /opt/fonts --ignore-system-fonts` で PDF 化。
 
-バージョンが異なると、見出し番号の折り返しや表の罫線など細部のレンダリングが変わる可能性があります。バージョンを上げる場合は `Dockerfile` の該当値を更新してください(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため自動的に別タグになり、手動更新は不要です)。CI のビルド結果(生成 PDF のアーティファクト)で見た目の回帰を確認してください。
+生成物の配置は次のとおりです。いずれも git 対象外で、`make clean` で削除できます。
 
-### Typst バイナリのチェックサム検証
+| パス | 内容 |
+| --- | --- |
+| `build/<name>.pdf` | 最終成果物 |
+| `build/obj/` | 中間生成物(pandoc が生成した `.typ`、改訂履歴の変換 YAML) |
+| `build/diagrams/` | PlantUML から変換した SVG |
 
-`Dockerfile` は Typst の実行バイナリを GitHub Releases から取得し、sha256 で必ず検証します。ダウンロードしたバイナリが一致しない場合(改ざん・破損・バージョン不一致)はビルドが**エラーで停止**します。
+## 固定バージョン一覧
 
-`TYPST_ARCH` を指定しない場合、`Dockerfile` は `RUN` 内で `uname -m` からアーキテクチャを自動判定します(`x86_64` → `x86_64-unknown-linux-musl`、`aarch64` / `arm64` → `aarch64-unknown-linux-musl`)。この 2 アーキテクチャには既定の sha256(`TYPST_SHA256_X86_64` / `TYPST_SHA256_AARCH64`)が `Dockerfile` に焼き込み済みのため、x86_64 でも Apple Silicon 等の aarch64 でも `make pdf` で何も指定する必要はありません。
+| ツール | バージョン | 導入元 |
+| --- | --- | --- |
+| pandoc | 3.10(ベースイメージ `pandoc/core:3.10.0.0`) | Docker Hub(4 桁のイミュータブルタグ) |
+| Typst | 0.15.0 | GitHub Releases の musl 静的ビルド(sha256 検証) |
+| PlantUML | 1.2026.6 | Maven Central の jar(sha256 検証) |
+| Source Han Serif JP | 2.003R(Regular / Bold) | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
+| Source Han Sans JP | 2.005R(Medium / Bold) | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
+| Source Han Code JP | 2.012R(Regular / Bold) | Adobe 公式リポジトリのリリースタグ(sha256 検証) |
 
-それ以外のアーキテクチャ、または自動判定を上書きしたい場合は `TYPST_ARCH` ビルド引数を明示指定してください。焼き込み値がないアーキテクチャの場合は対応する `TYPST_SHA256` もあわせて必要です(例: `docker build --build-arg TYPST_ARCH=<対応するターゲット triple> --build-arg TYPST_SHA256=<対応するsha256> .`)。
+## Typst バイナリのチェックサム検証
 
-参考: v0.15.0 の musl 静的ビルドの sha256(GitHub Releases のアセットダイジェスト。`Dockerfile` の焼き込み値と一致):
+`Dockerfile` は GitHub Releases から Typst の tar.xz を取得し、sha256 を検証してから導入します。
 
-| アーキテクチャ | sha256 |
-|---|---|
-| `x86_64-unknown-linux-musl`(自動判定対象。`Dockerfile` に設定済み) | `59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea` |
-| `aarch64-unknown-linux-musl`(自動判定対象。`Dockerfile` に設定済み) | `cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620` |
+- **アーキテクチャの自動判定**: ビルド引数 `TYPST_ARCH` が空なら `uname -m` から `x86_64-unknown-linux-musl` / `aarch64-unknown-linux-musl` を自動選択します。この 2 つ以外は明示指定が必要です。
+- **焼き込み sha256**(Typst 0.15.0):
+  - x86_64: `59b207df01be2dab9f13e80f73d04d7ff8273ffd46b3dd1b9eef5c60f3eeabea`
+  - aarch64: `cdf50ffc7b8ba759ed02200632eda3d78eb8b99aacb6611f4f75684990647620`
+- **上書き**: 他アーキテクチャやバージョン変更時は `TYPST_ARCH` / `TYPST_SHA256` ビルド引数で指定します。`make pdf TYPST_SHA256=<sha256>` のように make 変数でも渡せます(この値は `DOCKER_TAG` のハッシュにも含まれます)。
+- **検証スキップ**: `ALLOW_UNVERIFIED=1` で検証を省略できます(非推奨。焼き込み値が古くなった場合の脱出ハッチ)。
 
-sha256 の取得方法(ワンライナー。URL のバージョン・アーキテクチャは適宜読み替え):
+sha256 の取得ワンライナー:
 
 ```sh
 curl -fsSL "https://github.com/typst/typst/releases/download/v0.15.0/typst-x86_64-unknown-linux-musl.tar.xz" | sha256sum
 ```
 
-取得した値を指定してビルドする:
+## PlantUML jar のチェックサム検証
 
-```sh
-make pdf TYPST_SHA256=<取得したsha256>
-```
+PlantUML は Maven Central の jar を取得します。jar はアーキテクチャ非依存かつイミュータブルなので、`PLANTUML_VERSION` と `PLANTUML_SHA256` の固定だけで決定的に導入できます。現在の固定値は `1.2026.6` / `e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8` です。バージョンを上げる場合は両方のビルド引数(または `Dockerfile` の既定値)を差し替えます。
 
-チェックサム検証なしでビルドする場合(非推奨。検証値を用意できない例外的な場合のみ。焼き込み済みの既定値による検証もスキップされます):
+## ベースイメージの digest 固定
 
-```sh
-make pdf ALLOW_UNVERIFIED=1
-```
-
-### PlantUML jar のチェックサム検証
-
-`Dockerfile` は PlantUML の jar を Maven Central(`repo1.maven.org`)から取得し、焼き込み済みの sha256 で必ず検証します。Maven Central の成果物はイミュータブル(同一バージョンの再 push 不可)で、jar はアーキテクチャ非依存のため、バージョンと sha256 の固定だけで決定的に導入できます。
-
-| バージョン | sha256 |
-|---|---|
-| 1.2026.6(既定。`Dockerfile` に設定済み) | `e620ae095a2ba0134d3c33fd5ae34ff01e785f3df1796c0898802b8761a033a8` |
-
-バージョンを変更する場合は、`Dockerfile` の `PLANTUML_VERSION` / `PLANTUML_SHA256` を更新してください。sha256 の取得方法:
-
-```sh
-curl -fsSL "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/<version>/plantuml-<version>.jar" | sha256sum
-```
-
-### ベースイメージ(pandoc/core)の digest 固定
-
-`Dockerfile` は既定で `pandoc/core:3.10.0.0` を 4 桁のイミュータブルタグで使用しています(`3.10` のような 3 桁以下の数値タグは rolling で、リポジトリ側から再 push されうるため使わない)。さらに厳密にする場合は digest を固定してください。
+ベースイメージは `pandoc/core:3.10.0.0` です。4 桁タグは実体が固定されますが、さらに digest で固定したい場合は次の手順で上書きします。
 
 ```sh
 docker pull pandoc/core:3.10.0.0
 docker inspect --format '{{index .RepoDigests 0}}' pandoc/core:3.10.0.0
-# 例: pandoc/core@sha256:<digest>
 ```
 
-取得した digest を `PANDOC_IMAGE` ビルド引数として指定します(`docker build` を直接呼ぶか、`Makefile` の `docker-build` ターゲットに引数を追加してください)。
-
-```sh
-docker build --build-arg PANDOC_IMAGE=pandoc/core@sha256:<digest> -t jp-spec-builder .
-```
+得られた `pandoc/core@sha256:...` を `Dockerfile` の `ARG PANDOC_IMAGE` の既定値に書き換えます(`Dockerfile` の変更で `DOCKER_TAG` が変わり、次回ビルドで自動的に再構築されます)。手動の `docker build` なら `--build-arg PANDOC_IMAGE=pandoc/core@sha256:...` でも指定できます。
 
 ## フォント
 
-フォントはリポジトリに同梱せず、イメージの構築時に Adobe の公式 GitHub リポジトリ(リリースタグの raw URL)から取得し、sha256 検証のうえ `/opt/fonts` に配置します。タグ付きコミットのファイルはイミュータブルなので、これで決定的に導入できます。[SIL Open Font License 1.1](https://scripts.sil.org/OFL) のライセンス文書も同じ場所に併置されます。
+フォントは Adobe 公式リポジトリ(adobe-fonts)のリリースタグの raw URL から取得し、sha256 検証のうえ `/opt/fonts` に焼き込みます。ライセンスは SIL OFL 1.1 で、再配布条件に従いライセンス文書も `/opt/fonts` に併置します(リポジトリにはフォントを同梱しません)。各ファイルの取得 URL と sha256 は `Dockerfile` のフォント導入レイヤーに一覧で書かれています。
 
-| ファイル | 用途 | Typst 上のファミリー名 | ウェイト | 取得元(リポジトリ@タグ) |
-|---|---|---|---|---|
-| `SourceHanSerifJP-Regular.otf` | 本文(明朝) | `Source Han Serif JP` | Regular (400) | `source-han-serif@2.003R` |
-| `SourceHanSerifJP-Bold.otf` | 本文太字 | `Source Han Serif JP` | Bold (700) | `source-han-serif@2.003R` |
-| `SourceHanSansJP-Medium.otf` | 見出し・表・UI(ゴシック) | `Source Han Sans JP` | Medium (500) | `source-han-sans@2.005R` |
-| `SourceHanSansJP-Bold.otf` | 見出し太字 | `Source Han Sans JP` | Bold (700) | `source-han-sans@2.005R` |
-| `SourceHanCodeJP-Regular.otf` | コード(等幅) | `Source Han Code JP R` | Regular (400) | `source-han-code-jp@2.012R` |
-| `SourceHanCodeJP-Bold.otf` | コード太字 | `Source Han Code JP R` | Bold (700) | `source-han-code-jp@2.012R` |
+| ファイル | 用途 | Typst 上のファミリー名 | ウェイト |
+| --- | --- | --- | --- |
+| SourceHanSerifJP-Regular.otf / -Bold.otf | 本文(明朝) | `Source Han Serif JP` | Regular / Bold |
+| SourceHanSansJP-Medium.otf / -Bold.otf | 見出し・表・UI 要素(ゴシック) | `Source Han Sans JP` | Medium / Bold |
+| SourceHanCodeJP-Regular.otf / -Bold.otf | コード(等幅) | `Source Han Code JP R` | Regular / Bold |
 
-各ファイルの取得 URL と sha256 は `Dockerfile` のフォント導入レイヤーに一覧で書かれています(検証に失敗するとイメージ構築はエラーで停止します)。
+**注意**: Source Han Code JP は、Typst では `Source Han Code JP R` でないと解決できません。フォント内部の name テーブルで実際にマッチするファミリー名が `Source Han Code JP R` であり、Typst は末尾の "R" / "B" を weight として自動分離しないためです(`template/spec.typ` の `font-code` のコメント参照)。CJK フォントは表面上のファミリー名と Typst が解決する名前が食い違うことがあるので、差し替え時は必ず実際の name テーブルを確認してください(`fontTools` で確認できます)。
 
-**注意(重要)**: `SourceHanCodeJP-*.otf` の OpenType name テーブル上のファミリー名は `Source Han Code JP` ですが、Typst のフォントマッチングでは `Source Han Code JP R` を指定しないと解決できません(末尾の `R`/`B` が weight として自動分離されないため)。同様に `Source Han Sans JP Medium` は `Source Han Sans JP`(ファミリー名からウェイト語が自動的に取り除かれる)として解決されます。フォントを差し替える際は、`fontTools` などで name テーブルを確認し、`template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` の値を実際に解決できるファミリー名に合わせて修正してください。
+PlantUML 図の中のフォントは `template/plantuml.config` の `defaultFontName`(現在 `Source Han Sans JP`)が指定します。Typst が SVG 内のテキストを `--font-path` から解決するため、ここも Typst が解決できるファミリー名でなければなりません。
 
-**図中テキストのフォントについて**: 全 PlantUML 図には `template/plantuml.config` が共通適用され、図中テキストのフォントを本文と同じ `Source Han Sans JP` に指定しています。生成される SVG はテキストをアウトライン化せずフォント名参照のまま保持し、Typst が `/opt/fonts`(`--font-path`)から解決して描画するため、最終 PDF のフォントは実行環境に依存しません。またイメージには `/opt/fonts` を参照する fontconfig 設定を焼き込んであり、PlantUML(Java)によるテキスト幅の計測も同じフォントで行われます(計測フォントが異なると、ラベル幅と図形サイズがずれることがあります)。
+fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き込みます。実行時は `--user` 指定のため `/var/cache/fontconfig` にも `$HOME` にも書き込めず、キャッシュがないと PlantUML(Java/AWT)の実行のたびにフォント走査が走るためです。PlantUML の文字幅計測を PDF 描画と同じフォントで行わないと、ラベル幅と箱のサイズがずれます。
 
-fontconfig のキャッシュはイメージ構築時に `fc-cache -f` で焼き込んでいます。ビルドは `docker run --user $(id -u)` で実行され、実行時は `/var/cache/fontconfig` にも `$HOME` にも書き込めないため、キャッシュがないと PlantUML の実行のたびにフォント走査が発生します(`Fontconfig error: No writable cache directories` の警告も出ます)。フォントを差し替える場合も、この `fc-cache` 実行はフォント導入レイヤーの末尾に残してください。
+### 別フォントへの差し替え手順
 
-### 別フォントへの差し替え手順(例: UDEV Gothic など)
+1. `Dockerfile` のフォント導入レイヤーを差し替える(取得 URL と sha256 の一覧)。
+2. 新フォントの name テーブルで、Typst が解決できるファミリー名を確認する。
+3. `template/spec.typ` のフォント定数(`font-serif` / `font-sans` / `font-code`)と `template/plantuml.config` の `defaultFontName` を変更する。
+4. `make pdf` を実行し、`unknown font family` の警告が出ないことを確認する(`Dockerfile` の変更でイメージは自動再構築されます)。
+5. エディタ内 Typst プレビューの利用者は `make fonts` を実行し直す(`.fonts/` は毎回作り直され、旧フォントは残りません)。
 
-1. `Dockerfile` のフォント導入レイヤーの一覧(URL と sha256)を、新しいフォントの取得先に差し替える。ライセンス文書の取得もあわせて差し替える(Web 配布されていないフォントを使う場合は、取得の代わりに `COPY` で `/opt/fonts` へ配置する形に変えてもよい)。
-2. `fontTools` 等で正しいファミリー名を確認する(`Source Han Code JP` の例のように、見かけと実際の解決名が異なることがあるため、必ず実際にコンパイルして確認すること)。
-3. `template/spec.typ` 冒頭の `font-serif` / `font-sans` / `font-code` を新しいファミリー名に書き換える。PlantUML 図を使っている場合は `template/plantuml.config` の `defaultFontName` もあわせて書き換える(図中テキストも Typst が同じ仕組みでフォント解決するため)。
-4. `make pdf` を実行し、`Typst warning: unknown font family: ...` が出ないことを確認する(`Makefile` の `DOCKER_TAG` は `Dockerfile` の内容ハッシュのため、`Dockerfile` を変更した時点で自動的に再構築される。PlantUML 図がある場合は図中テキストの描画も確認する)。
-5. エディタ内 Typst プレビュー(../README.md の「執筆中の自動更新とプレビュー」節)を使っている場合は、`make fonts` を実行し直して `.fonts/` を新しいフォントで書き出し直す。
+## ビルドの決定性
 
-## ビルドの決定性について
+誰がどの環境でビルドしても同じ PDF になるよう、次を徹底しています。
 
-同じ Markdown から常に同じ PDF(バイト単位ではなく見た目単位)を再現できるよう、次の対策をしています。
-
-- **バージョンピン**: pandoc(ベースイメージ)・typst・plantuml・フォントのすべてを `Dockerfile` で固定し、typst / plantuml / フォントは sha256 検証付きで取得しています。PlantUML はバージョンによって図のレイアウトが微妙に変わるため、図の見た目も含めてイメージのバージョン固定が効きます。
-- **`--ignore-system-fonts`**: `typst compile` に必ず付与し、実行環境にインストールされているフォントの影響を受けないようにしています。フォントはイメージ内の `/opt/fonts`(`--font-path`)のみを参照します。
-- **`date: none`**: `spec-doc` 内部で PDF のドキュメントメタデータの `date` は常に `none` に設定しています(ビルド実行時刻を PDF に埋め込まない)。表紙に表示される発行日は YAML メタデータの `date` フィールド(文字列)であり、ビルド時刻とは無関係です。
-- **CI での検証**: GitHub Actions(`.github/workflows/build.yml`)が PR のたびに `make pdf` で同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルドし、固定ツールチェーンの取得(ベースイメージのタグ・typst / plantuml / フォントの sha256 検証を含む)から PDF 生成までを通しで検証します。生成された PDF はワークフローのアーティファクトとしてダウンロードでき、PR 上で見た目を確認できます。main への push でも同じワークフローを実行します(Actions のキャッシュは既定ブランチで作られたものだけが他ブランチから読めるため、main での実行が Docker イメージキャッシュの供給源になります)。
+- 全ツールチェーンとフォントのバージョンピン+sha256 検証。
+- `typst compile` は `--ignore-system-fonts` で実行し、ホストやイメージのシステムフォントの混入を防ぐ(参照は `/opt/fonts` のみ)。
+- PDF メタデータの日付は `template/spec.typ` で `date: none` に固定(既定の auto はビルド時刻を埋め込み、同一入力でもバイト単位で一致しなくなるため)。
+- CI(`.github/workflows/build.yml`)が PR・main への push・週次(月曜 0:00 UTC)に `make test` → `make lint` → サンプル 2 種の `make pdf` → `make pdf-all` を通し検証。Docker イメージは `Dockerfile` のハッシュをキーにキャッシュされ、main での実行が各 PR ブランチへのキャッシュ供給源になります。週次実行はキャッシュを使わずフル構築し、依存の取得元消失を検知します。
 
 ## シンタックスハイライト
 
-コードブロックのシンタックスハイライト配色は `assets/typst-highlight.tmTheme`(TextMate 形式の配色テーマ)で定義しています。既定のハイライト配色は彩度の高い色(赤紫・鮮緑等)を含み、本テンプレートの青系を基調とした紙面の規律から浮いてしまうため、低彩度のパレットに差し替えています。`template/spec.typ` 側で `set raw(theme: "/assets/typst-highlight.tmTheme")` として読み込んでいます(`--root .` 前提のルート相対パス)。コードブロックの背景色(`code-bg`)はテーマではなく `spec.typ` 側で描画しているため、テーマファイル自体には背景色を指定していません。配色を変更したい場合はこの tmTheme ファイルを編集してください。
+コードブロックの配色は `assets/typst-highlight.tmTheme`(低彩度の独自テーマ)です。既定のハイライトは彩度が高く紙面から浮くため差し替えています。コードブロックの背景色はテーマではなく `template/spec.typ` 側(`code-bg`)が描画します。
 
-## 既知の制約・注意点
+## 既知の制約
 
-- 本テンプレートは Typst 0.15 系の構文を前提としています。
-- ビルドには Docker が必須です。Docker なしのローカルビルドは非サポートですが、上記の表と同じバージョンのツールとフォントを自前で用意すれば `scripts/container-build.sh` に `FONT_DIR=<フォントの場所>` を指定して直接実行し、再現できます。なお、Ubuntu の apt が提供する pandoc(24.04 時点で 3.1.3)は Typst ライターが古く、このテンプレートが前提とする出力(表キャプション・`table.header`・`{.unnumbered}`・脚注など)に対応していません。
-- イメージの構築時にはネットワークアクセス(Docker Hub・GitHub・Maven Central)が必要です。構築後のビルド実行はオフラインで動作します。
-- `pandoc/core` ベースイメージは既定でイミュータブルタグ(`pandoc/core:3.10.0.0`)固定であり、digest 固定ではありません。より厳密な決定性が必要な場合は上記「ベースイメージ(pandoc/core)の digest 固定」の手順に従い `PANDOC_IMAGE` を digest 指定に切り替えてください。
-- Alpine の apk で導入するパッケージ(特に graphviz。状態遷移図などシーケンス図以外の PlantUML 図のレイアウトエンジン)はバージョン未固定です。イメージを再構築する時期によって図のレイアウトが微妙に変わる可能性があります(構築済みイメージを使い続ける限りは変わりません)。
+- **Typst 0.15 系が前提**。テンプレート(`template/spec.typ`)は同梱バージョンの Typst でのみ検証しています。
+- **Docker 必須**。非サポートの参考情報として、同じバージョンのツールチェーンとフォントを自前で用意すれば、`scripts/container-build.sh` を直接実行できます。`Makefile` が設定する環境変数も自前で与えます。
+
+  ```sh
+  NAME=my-spec SRC_INPUTS=docs/my-spec.md FONT_DIR=/path/to/fonts \
+    sh scripts/container-build.sh
+  ```
+
+  Ubuntu の apt の pandoc は Typst ライターが古く非対応です。
+- **イメージ構築時のみネットワークが必要**(Typst / PlantUML / フォントの取得)。構築後のビルドはオフラインで動きます。
+- **apk の graphviz はバージョン未固定**。PlantUML のレイアウト(クラス図・状態遷移図など)に使われますが、Alpine のパッケージ版をそのまま導入しており、ベースイメージ更新で変わりえます。

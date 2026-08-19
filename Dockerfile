@@ -20,7 +20,8 @@ FROM ${PANDOC_IMAGE}
 ARG TYPST_VERSION=0.15.0
 # 空の場合は RUN 内で `uname -m` から自動選択する(x86_64 / aarch64 のみ)。
 # それ以外のアーキテクチャ、または既定の自動選択を上書きしたい場合は
-# `--build-arg TYPST_ARCH=...` で明示指定する(guides/BUILDING.md の Docker 節参照)。
+# `--build-arg TYPST_ARCH=...` で明示指定する(guides/BUILDING.md の
+# 「Typst バイナリのチェックサム検証」節参照)。
 ARG TYPST_ARCH=""
 # 既定の TYPST_VERSION 用、x86_64 / aarch64 それぞれの sha256(GitHub
 # Releases のアセットダイジェスト)。TYPST_ARCH 自動選択時はここから対応する
