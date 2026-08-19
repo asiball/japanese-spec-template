@@ -12,7 +12,7 @@ Markdown で構造だけを書き、体裁の作り込みは Typst テーマに�
 make example      # 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド → build/*.pdf
 ```
 
-pandoc / typst / plantuml とフォントは、すべて Docker イメージ内に固定バージョン+チェックサム検証で導入されます。ローカルへのインストールが不要なだけでなく、実行環境によらず同じ見た目の PDF が得られます(詳細は [BUILDING.md](BUILDING.md))。
+pandoc / typst / plantuml とフォントは、すべて Docker イメージ内に固定バージョン+チェックサム検証で導入されます。ローカルへのインストールが不要なだけでなく、実行環境によらず同じ見た目の PDF が得られます(詳細は [guides/BUILDING.md](guides/BUILDING.md))。
 
 自分の仕様書は、見本を `docs/` にコピーして書き始めます。
 
@@ -23,7 +23,7 @@ cp examples/wareki-api-spec.revisions.md docs/my-spec.revisions.md
 make pdf SRC=docs/my-spec.md
 ```
 
-章の多い文書は章別ファイル分割方式(`cp -r examples/sample-spec docs/my-spec`)が使えます(下記「章別ファイル分割」参照)。執筆時の約束事は下記「執筆ルール」を、Markdown に不慣れな方向けの手引きは [GETTING-STARTED.md](GETTING-STARTED.md) を参照してください。
+章の多い文書は章別ファイル分割方式(`cp -r examples/sample-spec docs/my-spec`)が使えます(下記「章別ファイル分割」参照)。執筆時の約束事と記法の早見表は [guides/WRITING.md](guides/WRITING.md) を、Markdown に不慣れな方向けの手引きは [guides/GETTING-STARTED.md](guides/GETTING-STARTED.md) を参照してください。
 
 ## 目次
 
@@ -33,9 +33,7 @@ make pdf SRC=docs/my-spec.md
 - [章別ファイル分割](#章別ファイル分割)
 - [執筆中の自動更新(make watch)](#執筆中の自動更新make-watch)
 - [エディタ内での Typst プレビュー](#エディタ内での-typst-プレビュー)
-- [図の挿入(画像と PlantUML)](#図の挿入画像と-plantuml)
-- [執筆ルール](#執筆ルール)
-- [エスケープハッチ(生 Typst の使い方)](#エスケープハッチ生-typst-の使い方)
+- [執筆ルール(要点)](#執筆ルール要点)
 - [レビュー・納品の運用(推奨)](#レビュー納品の運用推奨)
 - [ビルド環境の詳細](#ビルド環境の詳細)
 - [ライセンス](#ライセンス)
@@ -86,13 +84,13 @@ flowchart LR
 │   │   └── 01-introduction.md 〜 99-appendix.md
 │   │                                 章ファイル(ファイル名の辞書順が章順)
 │   ├── wareki-api-spec.md            サンプル仕様書(単一ファイル方式。API リファレンス型のレイアウト実例)
-│   └── wareki-api-spec.revisions.md  改訂履歴を別ファイル化した実例(下記「改訂履歴の別ファイル化」参照)
+│   └── wareki-api-spec.revisions.md  改訂履歴を別ファイル化した実例(guides/WRITING.md の「改訂履歴の別ファイル化」参照)
 ├── template/
 │   ├── spec.typ                      テーマ本体。美観に関する定義はすべてここに集約
 │   ├── template.typ                  Pandoc 用 Typst テンプレート(構造の橋渡しのみ)
 │   └── plantuml.config               全 PlantUML 図に共通適用する設定(図中フォントの指定など)
 ├── assets/
-│   ├── diagrams/                     PlantUML ソース(.puml)の置き場所。ビルド時に SVG へ自動変換(下記「図の挿入」参照)
+│   ├── diagrams/                     PlantUML ソース(.puml)の置き場所。ビルド時に SVG へ自動変換(guides/WRITING.md の「図の挿入」参照)
 │   ├── images/                       Markdown 本文から参照する図版(PNG/JPG/SVG)
 │   └── typst-highlight.tmTheme       コードブロックのシンタックスハイライト配色(低彩度パレット)
 ├── scripts/
@@ -102,30 +100,32 @@ flowchart LR
 │   ├── revisions-md2yaml.sh          改訂履歴の Markdown パイプ表 → YAML 変換(ビルド時に自動実行)
 │   ├── puml2svg.sh                   PlantUML → SVG 変換(ビルド時に自動実行)
 │   └── list-diagram-refs.sh          Markdown が参照する図の列挙(Makefile が変換対象の決定に使用)
+├── guides/                           人間向けの詳細ガイド
+│   ├── WRITING.md                    執筆リファレンス(記法の早見表・図・メタデータ・改訂履歴・生 Typst レシピ)
+│   ├── GETTING-STARTED.md            非技術者向けクイックスタート(Markdown 初心者の PM・品証向け)
+│   └── BUILDING.md                   ビルド環境の詳細(Docker・バージョン固定・チェックサム検証・フォント差し替え)
 ├── .vscode/                          VS Code の推奨拡張と Tinymist の設定(任意。下記「エディタ内での Typst プレビュー」参照)
 ├── .github/workflows/build.yml       CI(PR ごとに lint・lint.sh の回帰テスト・サンプルビルド・docs/ の自動ビルド検証を実行)
-├── Dockerfile                        ビルド環境(pandoc / typst / plantuml とフォントを固定バージョンで同梱。BUILDING.md 参照)
+├── Dockerfile                        ビルド環境(pandoc / typst / plantuml とフォントを固定バージョンで同梱。guides/BUILDING.md 参照)
 ├── .dockerignore                     ビルドコンテキストの除外指定(Dockerfile は COPY を行わないため全除外)
 ├── Makefile                          ビルドコマンド一式
 ├── README.md                         このファイル
-├── GETTING-STARTED.md                非技術者向けクイックスタート(Markdown 初心者の PM・品証向け)
-├── BUILDING.md                       ビルド環境の詳細(Docker・バージョン固定・チェックサム検証・フォント差し替え)
 ├── CLAUDE.md                         AI エージェント向けの執筆・ビルドガイド
 └── LICENSE                           ライセンス(MIT。「ライセンス」節を参照)
 ```
 
-`docs/` が利用者の原稿置き場、`examples/` がコピー元・参照用の見本です。`examples/` 配下は README・CLAUDE.md から実例として参照されているため、書き換えずに残しておくことを推奨します(サンプルを削除する場合は、`Makefile` の `example` ターゲットと CI(`.github/workflows/build.yml`)のサンプルビルド 2 ステップが `examples/` を直接参照しているため、あわせて削除してください。残したまま `examples/` だけ消すと `make example` と CI が失敗します)。
+`docs/` が利用者の原稿置き場、`examples/` がコピー元・参照用の見本です。`examples/` 配下は README・guides/ 配下のガイド・CLAUDE.md から実例として参照されているため、書き換えずに残しておくことを推奨します(サンプルを削除する場合は、`Makefile` の `example` ターゲットと CI(`.github/workflows/build.yml`)のサンプルビルド 2 ステップが `examples/` を直接参照しているため、あわせて削除してください。残したまま `examples/` だけ消すと `make example` と CI が失敗します)。
 
 `docs/` に文書を置けば、設定変更なしで CI(`make pdf-all`。PR・main への push・週次の定期実行で起動)がビルド検証し、生成された PDF をワークフローのアーティファクトから取得できます。ビルド対象外の作業ファイル(下書き・共有素材など)は `_` 始まりの名前(例: `docs/_drafts/`、`docs/_memo.md`)にすると `make pdf-all` の対象外になります(それ以外の規約に合わない `.md` は、無言でビルド対象から漏れるのを防ぐためエラーで停止します)。
 
 ### テンプレート本体の更新の取り込み
 
-`docs/`(原稿)と `assets/`(図版)以外 — `template/` / `scripts/` / `Makefile` / `Dockerfile` / `.github/` — は、利用者が原則編集しない共通基盤です。このテンプレートを複製して書き始めた後にテンプレート本体側のバグ修正・改善を取り込みたい場合は、基盤ファイルだけを上書き取得します。
+`docs/`(原稿)と `assets/`(図版)以外 — `template/` / `scripts/` / `Makefile` / `Dockerfile` / `.github/` / `guides/` — は、利用者が原則編集しない共通基盤です。このテンプレートを複製して書き始めた後にテンプレート本体側のバグ修正・改善を取り込みたい場合は、基盤ファイルだけを上書き取得します。
 
 ```sh
 git remote add upstream <テンプレートリポジトリの URL>   # 最初の 1 回だけ
 git fetch upstream
-git checkout upstream/main -- template/ scripts/ Makefile Dockerfile .github/ BUILDING.md
+git checkout upstream/main -- template/ scripts/ Makefile Dockerfile .github/ guides/
 ```
 
 `template/spec.typ` を自分でカスタマイズしている場合は上書きされるため、先に差分を確認してから取り込んでください。
@@ -154,8 +154,8 @@ make help                       # 上記コマンド一覧を表示(引数なし
    - **エラー(ビルド停止)**: 見出しの手動採番(`# 1. foo` / `## 2) foo` / `## 1.1. foo` / `## 1．foo` / `## (1) foo` のような「番号+ドット/括弧」形式、`# 第1章 foo` / `# 1章 foo` のような「(第)N章/節/項」形式)、YAML フロントマターの `title:` 欠落・空、章別ファイル分割時に 00-meta.md 以外の章ファイルへ YAML フロントマターが混入していること、PlantUML 参照の不備(`.puml` の直接画像参照、`/build/diagrams/<name>.svg` 形式(ルート絶対パス)以外の図の参照、参照に対応する `assets/diagrams/<name>.puml` の不存在)、`/assets/` 配下の参照先ファイル・フロントマターの `logo:` が指す画像の不存在。
    - **警告(ビルド継続)**: 見出しが数字で始まる(`## 2.5 系` のようなバージョン表記など、上記エラーパターンには一致しないが手動採番の疑いがあるケース)、生 Typst(` ```{=typst} `)ブロック内の装飾コード検出、章別ファイル分割時に同一ディレクトリ内の複数章ファイルで脚注定義 ID(`[^id]:`)が重複していること。
 3. ビルド対象の Markdown が参照している PlantUML 変換図(`/build/diagrams/*.svg`)に対応するソース(`assets/diagrams/<name>.puml`)を `scripts/puml2svg.sh` で変換する(変更されたものだけを再変換。図を参照していない文書では何もしない)。
-4. `pandoc --from markdown --to typst --standalone --template template/template.typ` で Markdown を Typst ソースに変換(`build/obj/<name>.typ` に出力)。章別ファイル分割の場合は 00-meta.md を含む章ファイル一覧(ファイル名の辞書順)を複数の入力として pandoc に渡す(pandoc は複数入力ファイルを連結して 1 文書として処理する)。改訂履歴を別ファイル化している場合は、`revisions.md`(または `<name>.revisions.md`)を YAML に変換したうえで(YAML 方式ならそのまま)`--metadata-file` も付与される(下記「改訂履歴の別ファイル化」参照)。
-5. `typst compile --root . --font-path /opt/fonts --ignore-system-fonts` で PDF を生成(`build/<name>.pdf`)。フォントはイメージに焼き込まれたものを参照する([BUILDING.md](BUILDING.md) の「フォント」節参照)。
+4. `pandoc --from markdown --to typst --standalone --template template/template.typ` で Markdown を Typst ソースに変換(`build/obj/<name>.typ` に出力)。章別ファイル分割の場合は 00-meta.md を含む章ファイル一覧(ファイル名の辞書順)を複数の入力として pandoc に渡す(pandoc は複数入力ファイルを連結して 1 文書として処理する)。改訂履歴を別ファイル化している場合は、`revisions.md`(または `<name>.revisions.md`)を YAML に変換したうえで(YAML 方式ならそのまま)`--metadata-file` も付与される(guides/WRITING.md の「改訂履歴の別ファイル化」参照)。
+5. `typst compile --root . --font-path /opt/fonts --ignore-system-fonts` で PDF を生成(`build/<name>.pdf`)。フォントはイメージに焼き込まれたものを参照する([guides/BUILDING.md](guides/BUILDING.md) の「フォント」節参照)。
 
 `build/` 配下は、最終成果物と中間生成物をサブフォルダで分けています。
 
@@ -187,9 +187,9 @@ docs/my-spec/
 └── 99-appendix.md
 ```
 
-- **`00-meta.md`**: フロントマター専用ファイル。**必須**。存在しない場合、`make pdf` は明確なエラーで停止します(章ファイルだけを置いて `00-meta.md` を忘れたディレクトリは、`make pdf-all` もビルド対象として検出できないためエラーで停止します。黙って未ビルドのまま CI が緑になるのを防ぐためです)。`title` などのメタデータ(下記「メタデータ」節参照)をここに書きます。本文(見出しや段落)はここには書かず、章ファイル側に書いてください。
+- **`00-meta.md`**: フロントマター専用ファイル。**必須**。存在しない場合、`make pdf` は明確なエラーで停止します(章ファイルだけを置いて `00-meta.md` を忘れたディレクトリは、`make pdf-all` もビルド対象として検出できないためエラーで停止します。黙って未ビルドのまま CI が緑になるのを防ぐためです)。`title` などのメタデータ([guides/WRITING.md](guides/WRITING.md) の「メタデータ(YAML フロントマター)一覧」参照)をここに書きます。本文(見出しや段落)はここには書かず、章ファイル側に書いてください。
 - **`[0-9][0-9]-*.md`**: 章ファイル。**ファイル名の辞書順がそのまま章の並び順**になります(`00-meta.md` 自身もこのパターンに一致するため、常に先頭に来ます)。1 つ以上必要です(`00-meta.md` のみでは `make pdf` がエラーで停止します)。
-- **`revisions.md`(推奨)/ `revisions.yaml`(代替)**: 改訂履歴。数字プレフィックスを持たないため章ファイルの glob には含まれません。単一ファイル方式の `<name>.revisions.md` / `<name>.revisions.yaml` と同じ変換・併存エラー・`--metadata-file` の仕組みがそのまま使えます(下記「改訂履歴の別ファイル化」参照)。
+- **`revisions.md`(推奨)/ `revisions.yaml`(代替)**: 改訂履歴。数字プレフィックスを持たないため章ファイルの glob には含まれません。単一ファイル方式の `<name>.revisions.md` / `<name>.revisions.yaml` と同じ変換・併存エラー・`--metadata-file` の仕組みがそのまま使えます(guides/WRITING.md の「改訂履歴の別ファイル化」参照)。
 
 ### 運用上の注意
 
@@ -242,211 +242,13 @@ PDF ビューアを開き直さずに仕上がりを確認したい場合は、V
 - **プレビューが更新されないときは `make watch` のターミナルを確認してください**。lint や pandoc がエラーになると `.typ` が再生成されず、プレビューは古い内容のまま変化しません。
 - フォントを差し替えたとき(`Dockerfile` のフォント導入レイヤーを変更したとき)は、`make fonts` を実行し直してください。
 
-## 図の挿入(画像と PlantUML)
+## 執筆ルール(要点)
 
-### 画像ファイル(PNG/JPG/SVG)
+- **Markdown は構造のみ**を書きます。太字・表・コードブロック・脚注など Markdown 標準の記法だけを使い、フォント指定・色・余白などスタイルに関する記述は書きません(見た目はすべて `template/spec.typ` が自動適用します)。
+- **見出しに手動で番号を振りません**。`# はじめに` と書けば「1 はじめに」のように自動採番されます(自分で番号を書くと二重になります。付録など番号を振らない章は `{.unnumbered}` を付けます)。
+- **図はソースだけを Git 管理します**。画像は `assets/images/` に、PlantUML は `assets/diagrams/<name>.puml` に置き、SVG への変換はビルドに任せます(生成 SVG はコミットしません)。
 
-出来上がった画像は `assets/images/` に置き、リポジトリルートからの絶対パスで参照します。画像を単独の段落として書くと図(figure)として扱われ、代替テキストがキャプションになり、図番号が自動で振られます。`{width=70%}` のような幅指定も使えます。
-
-```markdown
-![在庫管理システムの構成概要](/assets/images/system-overview.png){width=70%}
-```
-
-### PlantUML(シーケンス図・状態遷移図・クラス図など)
-
-PlantUML で書ける図は、**ソース(`.puml`)だけを Git 管理し、SVG への変換はビルドに任せる**方式を採ります。生成画像をコミットしないため、「ソースを直したのに画像の再生成を忘れる」事故が起きず、図の変更も `.puml` のテキスト差分でレビューできます。
-
-使い方は次の 2 手順だけです。
-
-1. PlantUML ソースを `assets/diagrams/<name>.puml` に置く。
-2. Markdown からは**変換後の SVG のパス**(`/build/diagrams/<name>.svg`。`<name>` はソースと同名)を画像参照する。
-
-```markdown
-![在庫引当作成の処理シーケンス](/build/diagrams/reservation-sequence.svg){width=75%}
-```
-
-ビルド時には、`make pdf` が参照から逆引きした `assets/diagrams/<name>.puml` を `build/diagrams/<name>.svg` へ自動変換します(`scripts/puml2svg.sh`。変更されたものだけを再変換)。原稿が参照するパスがそのまま変換の出力先なので、PDF が古い図で作られることはありません。キャプション・図番号・幅指定は画像ファイルの場合と同様に機能します。
-
-運用上のポイント:
-
-- **エディタの Markdown プレビューでも図を表示できます**。参照先が実在の SVG になるため、一度 `make pdf`(または `make watch` を常駐)すれば、ルート絶対パスをワークスペースルート基準で解決するプレビュー(VS Code 標準の Markdown プレビューなど)で図がインライン表示されます。`make watch` 中は `.puml` を保存するたびに SVG が更新されます(プレビューへの反映は、Markdown 側の編集・保存などプレビューが再描画されるタイミングです)。clone 直後や `make clean` 直後はビルドするまで図が表示されません(壊れた画像アイコンになりますが異常ではありません)。なお、図の執筆中のフィードバックには PlantUML 拡張(jebbs.plantuml。`.vscode/extensions.json` に推奨拡張として登録済み)による `.puml` のサイドプレビューが便利です。
-- **図中テキストのフォントは本文と同じフォント(Source Han Sans JP)に統一されます**。`template/plantuml.config` が全図に共通適用されるためで、SVG 内のテキストは Typst がイメージ内のフォント(`/opt/fonts`)から解決して描画します。配色(参加者・状態・グループ枠の背景色や罫線色など)も本文の紙面テーマ(`template/spec.typ` の配色)に統一されます。図の見た目に関する共通設定を増やしたい場合もこのファイルに書きます(個々の図固有の設定は各 `.puml` に書いてかまいません)。
-- **参照は `/build/diagrams/<name>.svg` 形式(ルート絶対パス)で書いてください**。`.puml` の直接参照・相対パス参照・対応する `.puml` が存在しない参照は、`scripts/lint.sh` がエラーでビルドを停止します。
-- **PlantUML・Graphviz のインストールは不要です**。ビルドに使う Docker イメージに固定バージョンが同梱されています(バージョン・チェックサム検証は [BUILDING.md](BUILDING.md) 参照)。
-
-実例: `examples/sample-spec/04-api-spec.md` が `assets/diagrams/reservation-sequence.puml`(シーケンス図)を、`examples/sample-spec/03-requirements.md` が `assets/diagrams/reservation-states.puml`(状態遷移図)を参照しています。
-
-## 執筆ルール
-
-- **Markdown は構造のみ**。太字・斜体・表・コードブロック・脚注・リンクなど Markdown 標準の記法で表現できることは、それだけを使ってください。フォント指定や色付けなど見た目に関する記述は書かないでください。
-- **斜体(`*強調*`)は、同梱の和文フォントにイタリック体がないため、和文の慣行に合わせてゴシック体で表現されます**。
-- **見出しに手動で番号を振らない**。`# はじめに` のように書き、`1. はじめに` のように自分で番号を付けないでください。番号は Typst 側の `#set heading(numbering: "1.1.1")` が章(H1)〜項(H3)まで自動的に採番します。H4 以降は番号なしの小見出しとして扱われます。`scripts/lint.sh` は `# 1. foo` / `## 第2節 foo` のようなパターンを検出するとエラーでビルドを停止します。`## 2.5 系` のような数値で始まる見出し(バージョン表記など)はエラーパターンには一致しませんが、手動採番の疑いがある旨の警告(ビルドは継続)を表示することがあります。誤検知の警告であれば無視してかまいません。
-- **付録など番号を振らない章には `{.unnumbered}` を付ける**。`# 付録A: エスケープハッチの例 {.unnumbered}` のように見出しに `{.unnumbered}` 属性を付けると、Pandoc がその見出しを numbering: none の Typst 見出しに変換し、自動採番の対象から外れます(改ページ・目次への収載は維持されます)。
-- **見出しレベルの運用**:
-  - H1: 章(章ごとに自動でページが変わります)
-  - H2: 節
-  - H3: 項
-  - H4 以降: 番号なしの小見出し(多用しすぎない)
-- **表**: Markdown のパイプテーブルを使ってください。キャプションを付けたい場合は表の直後に `: キャプション文` を書きます(Pandoc の table caption 記法)。ヘッダ行の網掛け・罫線・フォントは自動で適用されます。
-- **コードブロック**: フェンス付きコードブロックに言語名を指定してください(例: ` ```json `)。Typst 組み込みのシンタックスハイライトが自動的に適用されます。インラインコードはバッククォート 1 つで囲みます。
-- **脚注**: `本文[^1]` と `[^1]: 脚注の内容` の組み合わせで書けます。
-- **括弧**: 和文中の括弧は全角括弧を使い、英数字のみを囲む場合は半角括弧を使ってください（例: 「REST API(以下、「本 API」という)」→「REST API（以下、「本 API」という）」）。コードブロック・インラインコード内の括弧は対象外です。
-
-### メタデータ(YAML フロントマター)一覧
-
-| 変数 | 必須 | 説明 |
-|---|---|---|
-| `title` | 必須 | 表紙・ヘッダに表示するタイトル |
-| `subtitle` | 任意 | サブタイトル |
-| `docnumber` | 任意 | 文書番号(表紙・ヘッダに表示) |
-| `version` | 任意 | 版数 |
-| `date` | 任意 | 発行日 |
-| `author` | 任意 | 作成者 |
-| `organization` | 任意 | 発行組織名 |
-| `logo` | 任意 | 表紙に表示する組織ロゴ画像のパス(リポジトリルートからの絶対パス、例: `/assets/logo.png`)。高さ 12mm(`template/spec.typ` の `logo-height`)で描画され、横幅は画像のアスペクト比に応じて自動調整される。未指定の場合は表紙にロゴを表示しない |
-| `revisions` | 任意 | 改訂履歴の配列。各要素は `version` / `date` / `author` / `changes` を持つ。長くなってきたら別ファイル化できる(下記「改訂履歴の別ファイル化」参照) |
-
-例:
-
-```yaml
----
-title: "在庫管理API 仕様書"
-subtitle: "REST API 設計仕様"
-docnumber: "SPEC-2026-001"
-version: "1.2"
-date: "2026-07-14"
-author: "山田太郎"
-organization: "株式会社サンプル"
-revisions:
-  - version: "1.0"
-    date: "2026-05-01"
-    author: "山田太郎"
-    changes: "初版作成"
----
-```
-
-### 改訂履歴の別ファイル化(`revisions` が長くなってきたら)
-
-`revisions` をフロントマターにそのまま書き続けると、版を重ねるごとに YAML が長くなり、本文の開始位置がどんどん下に沈んでいきます。これを避けたい場合は、改訂履歴を別ファイルに切り出せます。書き方は次の 3 通りで、**推奨は 1. の Markdown 表方式**です。
-
-**注意(章別ファイル分割の場合)**: 以下は単一ファイル方式(`docs/<name>.md`)でのファイル名です。章別ファイル分割(`docs/<name>/`)の場合は、`docs/<name>.revisions.md` の代わりに `docs/<name>/revisions.md`(`<name>.` プレフィックスなし)を、`docs/<name>.revisions.yaml` の代わりに `docs/<name>/revisions.yaml` を置いてください。仕組み・変換・併存エラーはすべて同じです。
-
-#### 1. Markdown 表方式(推奨): `docs/<name>.revisions.md`
-
-`docs/<name>.md` に対して、同じディレクトリ・同じベース名の `docs/<name>.revisions.md` を置き、改訂履歴を Markdown のパイプ表(1 改訂 = 1 行)で書きます。YAML を書く必要がなく、改訂の追加が「表の末尾に 1 行追加する」だけになるため、差分(diff)も見やすくなります。
-
-```markdown
-| 版数 | 日付 | 作成者 | 改訂内容 |
-|---|---|---|---|
-| 1.0 | 2026-05-01 | 山田太郎 | 初版作成 |
-| 1.1 | 2026-06-10 | 鈴木花子 | API仕様の章を追加 |
-```
-
-ファイルを置くだけでよく、`Makefile` 側の設定変更は不要です。ビルド時に `scripts/revisions-md2yaml.sh` がこの表を `build/obj/<name>.revisions.yaml`(中間ファイル)へ変換し、pandoc に `--metadata-file` として渡します(`make pdf` / `make watch` のいずれも対応)。
-
-書式のルール:
-
-- 列は「版数 | 日付 | 作成者 | 改訂内容」の 4 列固定です(1 行目のヘッダ行の列名は自由ですが、列の並びはこの順)。4 列でない行があると「ファイル名:行番号」付きのエラーでビルドが停止します。
-- **セルの中に生の `|` は書けません**(セル区切りと区別できないため。エスケープ記法にも対応していません)。
-- 表以外の行(空行・メモ書き)は無視されますが、`|` で始まらない非空行には警告が表示されます。
-- このファイルは仕様書本文ではないため、`make lint` の対象外です(フロントマター不要)。
-- `examples/wareki-api-spec.md` + `examples/wareki-api-spec.revisions.md` が実例です。
-
-#### 2. YAML 方式(代替): `docs/<name>.revisions.yaml`
-
-YAML で直接管理したい場合は、トップレベルに `revisions:` 配列を持つ `docs/<name>.revisions.yaml` を置きます。こちらは変換なしでそのまま pandoc の `--metadata-file` に渡されます。
-
-```yaml
-revisions:
-  - version: "1.0"
-    date: "2026-05-01"
-    author: "山田太郎"
-    changes: "初版作成"
-```
-
-**注意**: `.revisions.md` と `.revisions.yaml` を**両方**置くと、どちらを意図しているか判別できないため、ビルドは明確なエラーで停止します。どちらか一方のみにしてください。
-
-#### 3. インライン方式: フロントマターに直接書く
-
-シンプルな文書で改訂回数が少ないうちは、`examples/sample-spec/00-meta.md` のようにフロントマターの `revisions:` にそのまま書く方式でも問題ありません(章別ファイル分割の場合は 00-meta.md に書きます)。
-
-#### 共通の注意
-
-`template/template.typ` 側の `$for(revisions)$` はメタデータの出所(フロントマターか `--metadata-file` か)を区別しないため、どの方式でも生成される改訂履歴表は同一です。
-
-**Pandoc の合成規則**: Pandoc はフロントマターのメタデータを `--metadata-file` で指定したメタデータより常に優先します。フロントマターと別ファイルの両方に `revisions` を書くとフロントマター側だけが有効になり、別ファイル側は静かに無視されます。**`revisions` は上記 3 方式のうちどこか 1 箇所にのみ書いてください**(`.revisions.md` と `.revisions.yaml` の併存だけはビルド時にエラーとして検出されます)。
-
-## エスケープハッチ(生 Typst の使い方)
-
-大半の内容は素の Markdown で書けますが、次のように **Markdown 標準の記法では表現できない場合に限り**、Pandoc の生 Typst 記法を使ってよいことにしています。
-
-````markdown
-```{=typst}
-#table(
-  columns: 2,
-  [結合セル], table.cell(rowspan: 2)[縦結合],
-  [通常セル],
-)
-```
-````
-
-使ってよい場面の例:
-
-- 表のセル結合(`table.cell(colspan: ..., rowspan: ...)`)
-- 相互参照・改ページ・横向きページ(下記レシピ)
-- Markdown の表現力を超える複雑なレイアウト
-
-### よく使う生 Typst レシピ
-
-Typst の構文を知らなくても、次の 3 つはそのまま貼って使えます。
-
-**相互参照(「1.1節を参照」)** — 参照したい見出しに ID を付け、本文からインラインの生 Typst で参照します。「1章」「1.1節」「1.1.1項」の形の番号付きリンクになり、番号は章の増減に自動で追随します。番号を表示しない見出し(H4 以降の小見出しと `{.unnumbered}` を付けた付録など)を参照した場合は、番号の代わりに見出しテキストのリンクになります。
-
-```markdown
-## 用語の定義 {#sec-terms}
-
-詳細は `@sec-terms`{=typst} を参照してください。
-```
-
-図・表も同じ書き方で参照できます(「図 1」「表 1」の番号付きリンクになります)。図は画像参照の属性に、表はキャプション行の末尾に ID を付けます。
-
-```markdown
-![処理の流れ](/build/diagrams/flow.svg){#fig-flow width=70%}
-
-| ID | 内容 |
-|:-:|:--|
-| 1 | ... |
-
-: 要件一覧 {#tbl-req}
-
-処理の流れを `@fig-flow`{=typst} に、要件を `@tbl-req`{=typst} に示す。
-```
-
-**改ページ** — 章の先頭は自動で改ページされますが、章の途中で任意に改ページしたい場合に使います。
-
-````markdown
-```{=typst}
-#pagebreak()
-```
-````
-
-**横向きページ(横長の表)** — 列数が多く縦のままでは読めない表を、そのページだけ横向きにして置きます(ヘッダ・フッタ・ページ番号は維持され、直前で自動的に改ページされます)。
-
-````markdown
-```{=typst}
-#page(flipped: true)[
-  #table(
-    columns: 4,
-    table.header([項目], [値1], [値2], [値3]),
-    [データ], [A], [B], [C],
-  )
-]
-```
-````
-
-**乱用しない**でください。見た目を整えるためだけに生 Typst を使うのは避け、まずは Markdown 標準の記法と `spec.typ` 側の自動スタイリングで表現できないか検討してください。
-
-`template/template.typ` は `#import "/template/spec.typ": *` によって `spec.typ` の定義一式(色定数・フォント定数・ヘルパー関数)を取り込んでいます。そのため生 Typst ブロックの中でも、たとえば `accent-color`(濃紺のアクセントカラー)や `font-sans` などをそのまま参照できます。`examples/sample-spec/99-appendix.md`(「付録A」)に実例があります。
+記法の一覧(見出し・表・図・脚注・相互参照の早見表、一般的な Markdown との違い、メタデータ一覧、改訂履歴の別ファイル化、生 Typst レシピ)は **[guides/WRITING.md](guides/WRITING.md)** にまとめています。
 
 ## レビュー・納品の運用(推奨)
 
@@ -459,7 +261,7 @@ Word の変更履歴・コメント往復の代替として、次の運用を推
 
 ## ビルド環境の詳細
 
-ビルド環境の構築・固定に関する詳細は [BUILDING.md](BUILDING.md) にまとめています。
+ビルド環境の構築・固定に関する詳細は [guides/BUILDING.md](guides/BUILDING.md) にまとめています。
 
 - Docker イメージの構成(pandoc / typst / plantuml / フォントの固定バージョンとチェックサム検証)
 - ベースイメージの digest 固定
@@ -468,10 +270,10 @@ Word の変更履歴・コメント往復の代替として、次の運用を推
 - コードブロックのシンタックスハイライト配色の変更
 - 既知の制約・注意点
 
-**参考(非サポート)**: Docker を使えない環境でも、[BUILDING.md](BUILDING.md) の表と同じバージョンの pandoc / typst / plantuml とフォント一式を自前で用意すれば、`make pdf` がコンテナ内で実行しているビルド本体(`scripts/container-build.sh`)を `FONT_DIR=<フォントの場所>` を指定して直接実行し、ローカルでビルドすることも可能です。バージョン・フォントの差による見た目の変化はサポート対象外です。
+**参考(非サポート)**: Docker を使えない環境でも、[guides/BUILDING.md](guides/BUILDING.md) の表と同じバージョンの pandoc / typst / plantuml とフォント一式を自前で用意すれば、`make pdf` がコンテナ内で実行しているビルド本体(`scripts/container-build.sh`)を `FONT_DIR=<フォントの場所>` を指定して直接実行し、ローカルでビルドすることも可能です。バージョン・フォントの差による見た目の変化はサポート対象外です。
 
 ## ライセンス
 
 このリポジトリに含まれるファイルは、リポジトリ直下の `LICENSE`(MIT License)に従います。
 
-フォントはリポジトリに同梱せず、Docker イメージの構築時に Adobe の公式リポジトリから取得します(sha256 検証付き)。フォント自体は [SIL Open Font License 1.1](https://scripts.sil.org/OFL) の下で配布されているもので、ライセンス条文はイメージ内の `/opt/fonts/` にフォントと併置されます。フォントの一覧・ファミリー名・差し替え手順は [BUILDING.md](BUILDING.md) の「フォント」節を参照してください。
+フォントはリポジトリに同梱せず、Docker イメージの構築時に Adobe の公式リポジトリから取得します(sha256 検証付き)。フォント自体は [SIL Open Font License 1.1](https://scripts.sil.org/OFL) の下で配布されているもので、ライセンス条文はイメージ内の `/opt/fonts/` にフォントと併置されます。フォントの一覧・ファミリー名・差し替え手順は [guides/BUILDING.md](guides/BUILDING.md) の「フォント」節を参照してください。
