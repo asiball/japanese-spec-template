@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-このリポジトリで Markdown 仕様書を執筆・ビルドする AI エージェント向けの手引きです。人間向けの詳しい説明は `README.md` を、ビルド環境の詳細は `BUILDING.md` を、Markdown に不慣れな利用者向けの手引きは `GETTING-STARTED.md` を参照してください。
+このリポジトリで Markdown 仕様書を執筆・ビルドする AI エージェント向けの手引きです。人間向けの詳しい説明は `README.md` を、執筆記法のリファレンスは `guides/WRITING.md` を、ビルド環境の詳細は `guides/BUILDING.md` を、Markdown に不慣れな利用者向けの手引きは `guides/GETTING-STARTED.md` を参照してください。
 
 **ディレクトリの役割**: 利用者の原稿は `docs/` に置く。`examples/` は見本(コピー元・実例参照用)であり、原則として書き換えない。
 
@@ -34,9 +34,9 @@ CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実�
 
 `SRC` のパスにスペースは使えない(Make の引数分割の制約のため)。スペースを含むパスを指定すると `make pdf` / `make watch` は明確なエラーメッセージで停止する(章別ファイル分割のディレクトリパス、およびその中の章ファイル名も対象)。単一ファイルの `SRC` は `.md` 拡張子が必須(改訂履歴の自動検出が `<name>.md` → `<name>.revisions.md` という命名規約に依存するため。`.md` 以外はエラーで停止する)。
 
-`make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(監視対象の章ファイル一覧・参照図の `.puml` 一覧はポーリングのたびに動的に再導出されるため、章ファイルの新規追加・削除や図参照の増減があっても `make watch` の再起動は不要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新」節を参照。
+`make watch` は Docker コンテナ内で `scripts/container-build.sh` が watch モードで動き続ける(リポジトリはマウント共有のため、ホスト側エディタの編集がそのまま検知される)。構成は (a) 初回 `make pdf` 相当を実行 → (b) `typst watch` をバックグラウンド起動(`.typ` / `template/*.typ` の変更を自動検知)→ (c) `<SRC_INPUTS>`(と改訂履歴の別ファイル・参照図に対応する `.puml`・`template/plantuml.config`)を 1 秒間隔でポーリングし、変更を検知したら lint →(`.revisions.md` / `revisions.md` があれば YAML 変換)→ PlantUML 図の再変換(変更分のみ)→ pandoc を再実行して `.typ` を再生成する、という三段構成。章別ファイル分割の場合、章ファイルを 1 つ編集して保存するだけで `<SRC_INPUTS>` 全体が pandoc に再度渡され `.typ` 全体が再生成される(監視対象の章ファイル一覧・参照図の `.puml` 一覧はポーリングのたびに動的に再導出されるため、章ファイルの新規追加・削除や図参照の増減があっても `make watch` の再起動は不要)。lint / 変換 / pandoc がエラーになっても watch 自体は停止せず継続する(修正して保存すれば次のポーリングで再試行される)。Ctrl-C で `typst watch` の子プロセスごと終了する。詳細は README の「執筆中の自動更新とプレビュー」節を参照。
 
-`.vscode/` と `make fonts` は、`make watch` が再生成する `build/obj/<name>.typ` を VS Code の Tinymist 拡張でライブプレビューするための設定とフォント書き出し(詳細は README の「エディタ内での Typst プレビュー」節)。プレビューは拡張同梱の Typst でコンパイルされるため、見た目の最終確認は `build/<name>.pdf` で行う。
+`.vscode/` と `make fonts` は、`make watch` が再生成する `build/obj/<name>.typ` を VS Code の Tinymist 拡張でライブプレビューするための設定とフォント書き出し(詳細は README の「執筆中の自動更新とプレビュー」節)。プレビューは拡張同梱の Typst でコンパイルされるため、見た目の最終確認は `build/<name>.pdf` で行う。
 
 ## 章別ファイル分割
 
@@ -44,7 +44,7 @@ CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実�
 
 - **`00-meta.md`**: フロントマター専用・必須。ここにのみ `title` 等のメタデータを書く(章ファイルだけを置いて `00-meta.md` を忘れたディレクトリは `make pdf-all` がエラーで停止する。無言でビルド対象から漏れるのを防ぐため)。
 - **`[0-9][0-9]-*.md`**: 章ファイル。ファイル名の辞書順が章順(`00-meta.md` は自然に先頭に来る)。1 つ以上必須。後から章を挿入しやすいよう `10-`, `20-`, `30-` のように番号を飛ばして振る運用も可。
-- **`revisions.md`(推奨)/ `revisions.yaml`(代替)**: 単一ファイルモードの `<name>.revisions.md` / `<name>.revisions.yaml` と同じ仕組み(README の「改訂履歴の別ファイル化」参照)。
+- **`revisions.md`(推奨)/ `revisions.yaml`(代替)**: 単一ファイルモードの `<name>.revisions.md` / `<name>.revisions.yaml` と同じ仕組み(guides/WRITING.md の「改訂履歴の別ファイル化」参照)。
 
 **フロントマターは 00-meta.md にのみ書くこと**。Pandoc は複数入力ファイルを連結する際、後方ファイルのフロントマターが前方を上書きするため、章ファイルにフロントマターを混入させると `title` 等が意図せず上書き・消去される(`scripts/lint.sh` がこれをエラーで検出する)。脚注定義 ID(`[^id]:`)は分割全体で一意にすること(重複すると連結時に衝突する。`scripts/lint.sh` が警告で検出する)。
 
@@ -52,7 +52,7 @@ CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実�
 
 ## 執筆 → ビルド → 確認 → 修正のループ
 
-1. `docs/*.md` を編集する(構造のみ。スタイル記述は禁止。詳細は README の「執筆ルール」参照)。
+1. `docs/*.md` を編集する(構造のみ。スタイル記述は禁止。詳細は guides/WRITING.md 参照)。
 2. `make pdf` を実行する。
 3. **Typst のエラーを読む**:
    - `typst compile` が失敗したら、エラーメッセージの該当行を `build/obj/<name>.typ` で直接開いて確認する。これは Pandoc が生成した Typst ソースなので、Markdown のどの記述がどの Typst コードに対応するかを突き合わせながら原因を特定する。
@@ -75,10 +75,10 @@ CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実�
 - 見出しレベル: H1=章(章ごとに自動改ページ)、H2=節、H3=項、H4 以降=番号なし小見出し。
 - **付録など番号を振らない章には `{.unnumbered}` を付ける**(例: `# 付録A: エスケープハッチの例 {.unnumbered}`)。自動採番の対象外になるが、改ページ・目次への収載は維持される。
 - 表・コードブロック・脚注は Markdown 標準の記法をそのまま使う。表の網掛け・罫線・キャプション書式は自動適用される(キャプション自体は表の直後の行に `: キャプション文` と書く)。`*強調*`(斜体)は和文にイタリックがないためゴシック体で表示される。
-- **相互参照**: 見出しに `{#sec-id}` で ID を付け、本文から `` `@sec-id`{=typst} `` で参照すると「1章」「1.1節」形式の番号付きリンクになる(番号を表示しない H4 以降・`{.unnumbered}` 見出しへの参照は見出しテキストのリンクになる)。図は画像参照の属性(`{#fig-id}`)、表はキャプション行の末尾(`: キャプション文 {#tbl-id}`)に ID を付けると同様に「図 1」「表 1」形式で参照できる(README の「よく使う生 Typst レシピ」参照)。
+- **相互参照**: 見出しに `{#sec-id}` で ID を付け、本文から `` `@sec-id`{=typst} `` で参照すると「1章」「1.1節」形式の番号付きリンクになる(番号を表示しない H4 以降・`{.unnumbered}` 見出しへの参照は見出しテキストのリンクになる)。図は画像参照の属性(`{#fig-id}`)、表はキャプション行の末尾(`: キャプション文 {#tbl-id}`)に ID を付けると同様に「図 1」「表 1」形式で参照できる(guides/WRITING.md の「よく使う生 Typst レシピ」参照)。
 - **図**: 画像ファイル(PNG/JPG/SVG)は `assets/images/` に置き `![キャプション](/assets/images/foo.png){width=70%}` のようにルート絶対パスで参照する。シーケンス図・状態遷移図などは PlantUML ソースを `assets/diagrams/<name>.puml` に置き、**変換後の SVG パスを画像参照する**(`![キャプション](/build/diagrams/<name>.svg){width=75%}`。`<name>` はソースと同名)。SVG への変換はビルドが参照からソースを逆引きして自動で行うため、生成 SVG をコミットしてはいけない(管理対象はソースのみ。`.puml` の直接画像参照は lint がエラーにする)。図中フォント等の共通設定は `template/plantuml.config` に書く。実例: `examples/sample-spec/04-api-spec.md` + `assets/diagrams/reservation-sequence.puml`(シーケンス図)、`examples/sample-spec/03-requirements.md` + `assets/diagrams/reservation-states.puml`(状態遷移図)。
 - 和文中の括弧は全角括弧、英数字のみを囲む場合は半角括弧を使う(コードブロック・インラインコード内は対象外)。
-- **改訂履歴(`revisions`)が長くなったら別ファイルに切り出せる**。推奨は `docs/<name>.revisions.md`(章別ファイル分割の場合は `docs/<name>/revisions.md`)という Markdown パイプ表(列は「版数|日付|作成者|改訂内容」の 4 列固定、1 改訂 = 1 行、セル内に生の `|` は不可)。代替として `docs/<name>.revisions.yaml` / `docs/<name>/revisions.yaml`(トップレベルに `revisions:` 配列)も使える。いずれも置くだけで `Makefile` が自動検出して pandoc の `--metadata-file` に反映する(`examples/wareki-api-spec.md` + `examples/wareki-api-spec.revisions.md` が単一ファイルモードの実例)。`.revisions.md` と `.revisions.yaml` の併存はビルドエラーになる。Pandoc の合成規則上、フロントマター側の `revisions` が `--metadata-file` 側を常に上書きするため、**`revisions` はフロントマター・別ファイルのいずれか 1 箇所にのみ書く**(推奨: `.revisions.md` / `revisions.md`)。詳細は README の「改訂履歴の別ファイル化」節を参照。
+- **改訂履歴(`revisions`)が長くなったら別ファイルに切り出せる**。推奨は `docs/<name>.revisions.md`(章別ファイル分割の場合は `docs/<name>/revisions.md`)という Markdown パイプ表(列は「版数|日付|作成者|改訂内容」の 4 列固定、1 改訂 = 1 行、セル内に生の `|` は不可)。代替として `docs/<name>.revisions.yaml` / `docs/<name>/revisions.yaml`(トップレベルに `revisions:` 配列)も使える。いずれも置くだけで `Makefile` が自動検出して pandoc の `--metadata-file` に反映する(`examples/wareki-api-spec.md` + `examples/wareki-api-spec.revisions.md` が単一ファイルモードの実例)。`.revisions.md` と `.revisions.yaml` の併存はビルドエラーになる。Pandoc の合成規則上、フロントマター側の `revisions` が `--metadata-file` 側を常に上書きするため、**`revisions` はフロントマター・別ファイルのいずれか 1 箇所にのみ書く**(推奨: `.revisions.md` / `revisions.md`)。詳細は guides/WRITING.md の「改訂履歴の別ファイル化」節を参照。
 
 ## エスケープハッチの判断基準
 
@@ -106,4 +106,4 @@ CI(`.github/workflows/build.yml`)も PR・main への push・週次の定期実�
 
 PlantUML 図の見た目(図中フォント・配色などの共通デザイン)だけは `template/plantuml.config` が担う(`spec.typ` は SVG の中身に関与できないため)。個々の図固有の `skinparam` は各 `.puml` に書いてよい。
 
-フォント自体を差し替える場合は、`template/spec.typ` のフォント定数だけでなく `Dockerfile` のフォント導入レイヤー(取得 URL と sha256)と `template/plantuml.config` の `defaultFontName` もあわせて変更する(手順は BUILDING.md の「フォント」節参照)。エディタ内 Typst プレビューを使っている場合は `make fonts` も実行し直す。
+フォント自体を差し替える場合は、`template/spec.typ` のフォント定数だけでなく `Dockerfile` のフォント導入レイヤー(取得 URL と sha256)と `template/plantuml.config` の `defaultFontName` もあわせて変更する(手順は guides/BUILDING.md の「フォント」節参照)。エディタ内 Typst プレビューを使っている場合は `make fonts` も実行し直す。

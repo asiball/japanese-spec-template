@@ -294,7 +294,7 @@ for f in "$@"; do
 					target=${target%% *}
 					case "$target" in
 						*.puml)
-							echo "ERROR: $f:$lineno: .puml を直接画像参照することはできません: $target(変換後の /build/diagrams/<name>.svg を参照し、ソースを assets/diagrams/<name>.puml に置いてください。README の「図の挿入」参照)。" >&2
+							echo "ERROR: $f:$lineno: .puml を直接画像参照することはできません: $target(変換後の /build/diagrams/<name>.svg を参照し、ソースを assets/diagrams/<name>.puml に置いてください。guides/WRITING.md の「図の挿入」参照)。" >&2
 							found_error=1
 							;;
 						/build/diagrams/*.svg)

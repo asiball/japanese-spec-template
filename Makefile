@@ -7,7 +7,7 @@
 #   make pdf SRC=docs/foo        章別ファイル分割ディレクトリをビルド(SRC 必須)
 #   make example                 同梱サンプル 2 種(章別ファイル分割・単一ファイル)をビルド
 #   make pdf-all                 docs/ 配下のビルド対象を自動発見して全件ビルド
-#   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新」参照。SRC 必須)
+#   make watch SRC=docs/foo.md   執筆中の自動リビルド(README の「執筆中の自動更新とプレビュー」参照。SRC 必須)
 #   make fonts                   エディタ内プレビュー用にフォントを書き出す
 #   make lint                    docs/ と examples/ の Markdown の簡易 lint のみを実行
 #   make test                    scripts/lint.sh 自体の回帰テストを実行
@@ -16,7 +16,7 @@
 #
 # ビルドはすべて Docker コンテナ内で実行する(pandoc / typst / plantuml と
 # フォントは Dockerfile が固定バージョン+チェックサム検証で導入する。
-# BUILDING.md 参照)。Makefile はビルド対象の導出と検証を担い、ビルド本体は
+# guides/BUILDING.md 参照)。Makefile はビルド対象の導出と検証を担い、ビルド本体は
 # scripts/container-build.sh が担う。lint(scripts/lint.sh)のみ POSIX sh
 # だけで動くためローカルで直接実行する。
 
@@ -56,13 +56,13 @@ REV_MD              := $(patsubst %.md,%.revisions.md,$(SRC))
 REV_YAML            := $(patsubst %.md,%.revisions.yaml,$(SRC))
 endif
 
-# 改訂履歴の別ファイル(README の「改訂履歴の別ファイル化」節参照)。存在の
+# 改訂履歴の別ファイル(guides/WRITING.md の「改訂履歴の別ファイル化」節参照)。存在の
 # 判定だけを行い、変換・--metadata-file の付与は container-build.sh が行う。
 # 両方存在する場合は validate-src がエラーで停止する。
 REV_MD_EXISTS    := $(wildcard $(REV_MD))
 REV_YAML_EXISTS  := $(wildcard $(REV_YAML))
 
-# PlantUML 図の変換(README の「図の挿入」節参照)。Markdown は変換後の
+# PlantUML 図の変換(guides/WRITING.md の「図の挿入」節参照)。Markdown は変換後の
 # /build/diagrams/<name>.svg を画像参照し(ビルド後はエディタの Markdown
 # プレビューでもそのまま表示できる)、参照 SVG から名前の 1:1 対応で
 # assets/diagrams/<name>.puml を逆引きして変換する。参照抽出はコードフェンス
@@ -78,7 +78,7 @@ DIAGRAM_PUMLS   := $(patsubst $(DIAGRAM_OUT)/%.svg,$(DIAGRAM_DIR)/%.puml,$(DIAGR
 DOCKER_IMAGE   := jp-spec-builder
 
 # Typst バイナリのチェックサム検証(既定値は Dockerfile に設定済みのため
-# 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。BUILDING.md 参照)。
+# 通常は指定不要。バージョン/アーキテクチャ変更時のみ上書きする。guides/BUILDING.md 参照)。
 #   make pdf TYPST_SHA256=<sha256>   検証値を差し替える
 #   make pdf ALLOW_UNVERIFIED=1      検証をスキップする(非推奨)
 TYPST_SHA256     ?=
@@ -281,7 +281,7 @@ fonts: docker-build
 	@rm -rf "$(FONTS)"
 	@mkdir -p "$(FONTS)"
 	$(DOCKER_RUN) $(DOCKER_FULLTAG) sh -c 'cp -R /opt/fonts/. "$(FONTS)/"'
-	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「エディタ内での Typst プレビュー」参照)"
+	@echo "fonts: $(FONTS)/ にフォントを書き出しました(README の「執筆中の自動更新とプレビュー」参照)"
 
 # 簡易 lint(scripts/lint.sh)。見出しの手動採番などを検知する。
 # `make lint` 単体は docs/ と examples/ の Markdown 全件を対象にする。
