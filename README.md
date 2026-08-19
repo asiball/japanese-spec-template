@@ -1,4 +1,4 @@
-# template-jp-document
+# japanese-spec-template
 
 日本語の仕様書を Markdown で書き、A4 縦の PDF に仕上げるテンプレートです。Markdown には文書の構造だけを書きます。フォント・配色・レイアウトなどの体裁は Typst テーマ(`template/spec.typ`)が自動で適用します。
 
