@@ -10,17 +10,17 @@
 
 # 4 桁のイミュータブルタグで固定する(pandoc/dockerfiles は 3.10 のような
 # 数値タグを rolling として再 push しうるため、a.b.c.d 形式でのみ実体が
-# 固定される。digest 固定が必要な場合は BUILDING.md の手順で上書き)。
+# 固定される。digest 固定が必要な場合は guides/BUILDING.md の手順で上書き)。
 ARG PANDOC_IMAGE=pandoc/core:3.10.0.0
 FROM ${PANDOC_IMAGE}
 
-# 変更時は TYPST_SHA256_X86_64 / TYPST_SHA256_AARCH64 も差し替える(BUILDING.md 参照)。
+# 変更時は TYPST_SHA256_X86_64 / TYPST_SHA256_AARCH64 も差し替える(guides/BUILDING.md 参照)。
 # Dockerfile の内容が変わると Makefile 側の DOCKER_TAG(内容ハッシュ)も
 # 自動的に変わるため、手動でのバージョン管理は不要。
 ARG TYPST_VERSION=0.15.0
 # 空の場合は RUN 内で `uname -m` から自動選択する(x86_64 / aarch64 のみ)。
 # それ以外のアーキテクチャ、または既定の自動選択を上書きしたい場合は
-# `--build-arg TYPST_ARCH=...` で明示指定する(BUILDING.md の Docker 節参照)。
+# `--build-arg TYPST_ARCH=...` で明示指定する(guides/BUILDING.md の Docker 節参照)。
 ARG TYPST_ARCH=""
 # 既定の TYPST_VERSION 用、x86_64 / aarch64 それぞれの sha256(GitHub
 # Releases のアセットダイジェスト)。TYPST_ARCH 自動選択時はここから対応する
@@ -107,12 +107,12 @@ RUN set -eu; \
 	printf '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig><dir>/opt/fonts</dir></fontconfig>\n' > /etc/fonts/conf.d/60-opt-fonts.conf; \
 	apk del curl
 
-# フォント(Adobe Source Han。BUILDING.md の「フォント」節参照)。
+# フォント(Adobe Source Han。guides/BUILDING.md の「フォント」節参照)。
 # 各リポジトリのリリースタグの raw URL から取得し sha256 で検証する
 # (タグ付きコミットのファイルはイミュータブルなので、これで決定的に導入
 # できる)。OFL の再配布条件に従い、ライセンス文書もフォントと同じ場所に置く。
 # フォントを差し替える場合はこの一覧と template/spec.typ のフォント定数・
-# template/plantuml.config をあわせて変更する(BUILDING.md の手順参照)。
+# template/plantuml.config をあわせて変更する(guides/BUILDING.md の手順参照)。
 RUN set -eu; \
 	apk add --no-cache curl; \
 	mkdir -p /opt/fonts; \
