@@ -57,6 +57,7 @@ Markdown が初めての方は [guides/GETTING-STARTED.md](guides/GETTING-STARTE
 - **構造は Markdown に**。見出し・表・コード・脚注だけを書き、スタイル記述は書きません。
 - **美観は `template/spec.typ` に一元化**。見た目を変えたいときはここだけを直します。
 - Markdown で原理的に表現できないもの(表のセル結合など)に限り、生 Typst のエスケープハッチを使えます。
+- `::: info` / `warning` / `error` の fenced div で、種類名付きの注記ボックスを書けます。
 
 pandoc / typst / plantuml とフォントは、固定バージョン+チェックサム検証で Docker イメージに同梱されます。誰がどの環境でビルドしても同じ見た目の PDF になります。
 

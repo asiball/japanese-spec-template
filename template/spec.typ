@@ -89,6 +89,48 @@
   line(length: width, stroke: weight + accent-color)
 }
 
+// Markdown の fenced div(`::: info` 等)から Lua フィルター経由で
+// 呼び出す注記ボックス。色だけに依存せず、種類名も常に表示する。
+#let admonition(kind: "info", body) = {
+  let border-color = if kind == "warning" {
+    rgb("#a06400")
+  } else if kind == "error" {
+    rgb("#a23434")
+  } else {
+    accent-color
+  }
+  let background-color = if kind == "warning" {
+    rgb("#fff8e8")
+  } else if kind == "error" {
+    rgb("#fff2f2")
+  } else {
+    rgb("#f2f7fb")
+  }
+  let label = if kind == "warning" {
+    [注意]
+  } else if kind == "error" {
+    [エラー]
+  } else {
+    [情報]
+  }
+
+  block(
+    width: 100%,
+    above: 1em,
+    below: 1em,
+    inset: (left: 1em, right: 1em, top: 0.75em, bottom: 0.75em),
+    stroke: (left: 3pt + border-color),
+    fill: background-color,
+    breakable: true,
+  )[
+    #set par(first-line-indent: 0em, spacing: 0.55em)
+    #block(below: 0.4em)[
+      #text(font: font-sans, size: 9.5pt, weight: "bold", fill: border-color)[#label]
+    ]
+    #body
+  ]
+}
+
 // =============================================================================
 // 表紙
 // =============================================================================
@@ -203,15 +245,26 @@
 // ヘッダ・フッタ(本文用)
 // =============================================================================
 #let doc-header(title: none, docnumber: none) = {
-  set text(font: font-sans, size: 8pt, fill: header-gray)
-  grid(
-    columns: (1fr, auto),
-    align: (left + horizon, right + horizon),
-    [#title],
-    [#if docnumber != none [#docnumber]],
-  )
-  v(-0.35em)
-  thin-rule(weight: 0.5pt, color: rule-gray)
+  context {
+    // H1 の章扉は見出し自体で十分に文書を識別できるため、
+    // ヘッダを隠して章の開始を明確にする。改訂履歴・目次の
+    // outlined: false の H1 は通常のヘッダを保つ。
+    let page-number = here().page()
+    let is-chapter-page = query(heading.where(level: 1, outlined: true))
+      .any(it => it.location().page() == page-number)
+
+    if not is-chapter-page {
+      set text(font: font-sans, size: 8pt, fill: header-gray)
+      grid(
+        columns: (1fr, auto),
+        align: (left + horizon, right + horizon),
+        [#title],
+        [#if docnumber != none [#docnumber]],
+      )
+      v(-0.35em)
+      thin-rule(weight: 0.5pt, color: rule-gray)
+    }
+  }
 }
 
 #let doc-footer() = context {
@@ -270,8 +323,10 @@
     first-line-indent: (amount: 1em, all: true),
   )
 
-  // ---- 見出し番号: レベル3まで "1.1.1" ----
-  set heading(numbering: "1.1.1")
+  // ---- 見出し番号: レベル3まで "1.1.1." ----
+  // 見出し本文と番号の境界を和文中でも読み取りやすくするため、
+  // 各レベルの番号末尾にピリオドを付ける。
+  set heading(numbering: (..nums) => numbering("1.1.1.", ..nums) + h(0.25em))
 
   // ---- 相互参照 ----
   // 見出しへの @ラベル 参照を「1章」「1.1節」「1.1.1項」の和文順で表記する
@@ -284,7 +339,9 @@
     let el = it.element
     if el != none and el.func() == heading {
       if el.numbering != none and el.level <= 3 {
-        let nums = numbering(el.numbering, ..counter(heading).at(el.location()))
+        // 見出しの表示用ピリオドは「1章」などの参照文字列には
+        // 含めない。
+        let nums = numbering("1.1.1", ..counter(heading).at(el.location()))
         let unit = if el.level == 1 { "章" } else if el.level == 2 { "節" } else { "項" }
         link(el.location())[#nums#unit]
       } else {
@@ -378,7 +435,7 @@
   // table 自体の fill を位置関数で与える。
   set table(
     stroke: none,
-    inset: (x: 8pt, y: 7pt),
+    inset: (x: 8pt, y: 8pt),
     fill: (x, y) => if y == 0 { table-header-bg } else { none },
   )
   show table.cell.where(y: 0): set text(font: font-sans, weight: "bold")
@@ -445,7 +502,7 @@
   // (見出しの直後の内容が次ページに送られる場合、見出し自体も一緒に送られる)。
   show heading.where(level: 2): it => block(above: 1.4em, below: 0.75em, width: 100%, breakable: false, sticky: true)[
     #box(
-      inset: (left: 0.65em, top: 0.3em, bottom: 0.3em, right: 0.3em),
+      inset: (left: 0.85em, top: 0.3em, bottom: 0.3em, right: 0.3em),
       stroke: (left: 3pt + accent-color),
     )[
       #set text(font: font-sans, size: 12pt, weight: "bold")
@@ -469,15 +526,16 @@
   show heading.where(level: 6): unnumbered-subheading
 
   // ---- 目次の見出し文字 ----
-  // 章(level 1)は太字ゴシックにして視覚的な階層を強調する。節・項は
-  // 現状のまま(フォントのみゴシックに揃える)。
+  // 章(level 1)は濃紺の太字、節・項は通常ウェイトにして
+  // 項目数が多くても章の切れ目を追いやすくする。
   show outline.entry: it => {
     set text(font: font-sans)
     if it.level == 1 {
-      v(0.6em, weak: true)
-      set text(weight: "bold")
+      v(0.75em, weak: true)
+      set text(weight: "bold", fill: accent-color)
       it
     } else {
+      set text(weight: "regular")
       it
     }
   }

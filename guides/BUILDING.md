@@ -17,7 +17,7 @@
 1. `scripts/lint.sh` によるビルド対象 Markdown の簡易チェック。
 2. 改訂履歴の別ファイルがあれば変換(`revisions.md` は `scripts/revisions-md2yaml.sh` で YAML へ)。
 3. 参照されている PlantUML 図を `scripts/puml2svg.sh` で SVG へ変換(`-tsvg -failfast2 -config template/plantuml.config -pipe`。mtime 比較で変更分のみ。参照の抽出はコードフェンス除外付きの `scripts/list-diagram-refs.sh`)。
-4. pandoc で Markdown → Typst ソースへ変換(`--template template/template.typ`)。
+4. pandoc で Markdown → Typst ソースへ変換(`--template template/template.typ --lua-filter scripts/admonitions.lua`)。Lua フィルターは `info` / `warning` / `error` の fenced div をテーマの注記ボックスへ変換する。
 5. `typst compile --root . --font-path /opt/fonts --ignore-system-fonts` で PDF 化。
 
 生成物の配置は次のとおりです。いずれも git 対象外で、`make clean` で削除できます。
