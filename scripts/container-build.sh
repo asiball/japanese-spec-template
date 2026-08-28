@@ -18,7 +18,8 @@
 #                  非サポートのローカルビルド時のみ上書きする)
 #
 # watch モード: 初回ビルド後に typst watch をバックグラウンド起動し、原稿・
-# 改訂履歴・参照図の .puml・plantuml.config を 1 秒間隔でポーリングして、
+# 改訂履歴・参照図の .puml・plantuml.config・Pandoc テンプレート・
+# Lua フィルターを 1 秒間隔でポーリングして、
 # 変更検知のたびに lint → 変換 → pandoc を再実行する(.typ の再生成を
 # typst watch が拾って PDF に反映する)。監視対象の原稿ファイル一覧と参照図の
 # .puml 一覧は current_inputs / current_pumls が毎回動的に導出するため、
@@ -40,6 +41,7 @@ OBJ=$BUILD/obj
 DIAGRAM_DIR=assets/diagrams
 DIAGRAM_OUT=$BUILD/diagrams
 TEMPLATE=template/template.typ
+ADMONITIONS_FILTER=scripts/admonitions.lua
 PLANTUML_CONFIG=template/plantuml.config
 
 if [ -n "$REV_MD" ]; then
@@ -113,6 +115,7 @@ regenerate_typ() {
 			--to typst \
 			--standalone \
 			--template "$TEMPLATE" \
+			--lua-filter "$ADMONITIONS_FILTER" \
 			$METADATA_FLAG \
 			-o "$OBJ/$NAME.typ" \
 			$inputs
@@ -157,7 +160,7 @@ while :; do
 	pumls=$(current_pumls $inputs)
 	# (a) mtime による変更検知(既存ファイルの編集)、(b) 前回イテレーションとの
 	# 一覧比較(章ファイル・図参照の増減)のいずれかで再生成する。
-	changed=$(find $inputs $REV_MD $REV_YAML $pumls "$PLANTUML_CONFIG" -newer "$stamp" 2>/dev/null || true)
+	changed=$(find $inputs $REV_MD $REV_YAML $pumls "$PLANTUML_CONFIG" "$TEMPLATE" "$ADMONITIONS_FILTER" -newer "$stamp" 2>/dev/null || true)
 	if [ "$inputs" != "$prev_inputs" ] || [ "$pumls" != "$prev_pumls" ]; then
 		changed=1
 	fi

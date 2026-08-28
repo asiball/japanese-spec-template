@@ -817,6 +817,166 @@ write docs/spec2/01-a.md <<-'EOF'
 	EOF
 expect_ok docs/spec1/00-meta.md docs/spec1/01-a.md docs/spec2/00-meta.md docs/spec2/01-a.md
 
+# --- 注記ボックス(fenced div) ---------------------------------------------
+
+new_case "注記ボックスの正常形(3 種類・属性形式・飾りの :・ネスト・引用/リスト内)は指摘なし"
+write docs/admonition-ok.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	# はじめに
+
+	::: info
+	情報。
+	:::
+
+	::: warning
+	注意。**強調**と `code` を含む。
+	:::
+
+	::: {.error #err-1}
+	属性形式。
+	:::
+
+	:::: info ::::
+	飾りの : 付き。
+	::::
+
+	::: warning
+	外側。
+
+	::: info
+	内側。
+	:::
+
+	外側の続き。
+	:::
+
+	> ::: info
+	> 引用内。
+	> :::
+
+	- 項目:
+
+	  ::: info
+	  リスト項目内。
+	  :::
+	EOF
+expect_ok docs/admonition-ok.md
+
+new_case "閉じフェンスのない注記ボックスはエラー"
+write docs/admonition-unclosed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: warning
+	閉じ忘れ。
+	EOF
+expect_error "対応する閉じフェンス(:::)がありません" docs/admonition-unclosed.md
+
+new_case "開始フェンスのない閉じフェンスはエラー"
+write docs/admonition-stray-close.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	本文。
+
+	:::
+	EOF
+expect_error "対応する開始フェンスのない閉じフェンス" docs/admonition-stray-close.md
+
+new_case "ネストした注記ボックスの閉じ忘れは開始行を指してエラー"
+write docs/admonition-nested-unclosed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: warning
+	外側。
+
+	::: info
+	内側(閉じ忘れ)。
+	:::
+	EOF
+expect_error "docs/admonition-nested-unclosed.md:5: 注記ボックスの開始フェンス(::: warning)" docs/admonition-nested-unclosed.md
+
+new_case "未対応の種類の注記ボックスは警告のみ"
+write docs/admonition-unknown-kind.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: note
+	未対応。
+	:::
+	EOF
+expect_warn '注記ボックスの種類 "note" は未対応です' docs/admonition-unknown-kind.md
+
+new_case "属性形式で対応種類のクラスがない注記ボックスは警告のみ"
+write docs/admonition-unknown-attr.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: {.tip #tip-1}
+	未対応。
+	:::
+	EOF
+expect_warn "注記ボックスの種類が info / warning / error のいずれでもありません" docs/admonition-unknown-attr.md
+
+new_case "種類名の後に文字が続く行は開始フェンスとして認識されない旨の警告"
+write docs/admonition-malformed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: info 補足
+	本文。
+	EOF
+expect_warn "開始フェンスとして認識されません" docs/admonition-malformed.md
+
+new_case "種類名の後に文字が続く開始フェンスに閉じフェンスが続くと不一致エラー"
+write docs/admonition-malformed-closed.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: info 補足
+	本文。
+	:::
+	EOF
+expect_error "対応する開始フェンスのない閉じフェンス" docs/admonition-malformed-closed.md
+
+new_case "コードフェンス内の ::: は検査しない"
+write docs/admonition-fenced.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	```markdown
+	::: note
+	本文。
+	:::
+	:::
+	```
+	EOF
+expect_ok docs/admonition-fenced.md
+
+new_case "CRLF 改行の注記ボックスも正常に対応付ける"
+write_crlf docs/admonition-crlf.md <<-'EOF'
+	---
+	title: テスト仕様書
+	---
+
+	::: info
+	情報。
+	:::
+	EOF
+expect_ok docs/admonition-crlf.md
+
 # --- 除外対象 ---------------------------------------------------------------
 
 new_case "*.revisions.md は検査対象外"

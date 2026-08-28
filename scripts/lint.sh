@@ -24,11 +24,17 @@
 #     (いずれもビルド後半で分かりにくいエラーになるため早期に止める)
 #   - /assets/ 配下の参照先ファイル(図版など)・フロントマターの logo: が
 #     指す画像の不存在(同上)
+#   - 注記ボックス(fenced div)のフェンス不一致: 閉じフェンス(:::)のない
+#     開始フェンス(::: info 等)、開始フェンスのない閉じフェンス(pandoc は
+#     div として認識せず、::: の行をそのまま本文として出力するため)
 #
 # 警告(exit 0。ビルドは継続):
 #   - 見出しが数字で始まる(`## 2.5 系` 等。手動採番の疑いがあるだけの場合)
 #   - 生 Typst ブロック内の装飾コード(見た目は spec.typ に一元化する方針)
 #   - 章ファイル間の脚注定義 ID(`[^id]:`)の重複(pandoc の連結時に衝突する)
+#   - 注記ボックスの種類が info / warning / error 以外(scripts/admonitions.lua
+#     が変換せず、装飾なしのブロックとして出力される)、および ::: で始まるが
+#     開始フェンスとして認識されない行(種類名の後に文字が続く等)
 #
 # コードフェンスの中身は誤検知を避けるためスキップする(```{=typst} の中身
 # だけは装飾コード検出の対象)。改訂履歴ファイル(*.revisions.md /
@@ -162,6 +168,8 @@ for f in "$@"; do
 	fence_len=0
 	list_mode=0
 	lineno=0
+	div_depth=0
+	div_stack=""
 
 	while IFS= read -r line || [ -n "$line" ]; do
 		lineno=$((lineno + 1))
@@ -275,6 +283,68 @@ for f in "$@"; do
 				;;
 		esac
 
+		# --- 注記ボックス(fenced div)のフェンス対応・種類名チェック ---
+		# pandoc は、閉じフェンスのない開始フェンスと開始フェンスのない閉じフェンス
+		# を div として認識せず、::: の行をそのまま本文として出力する(エラーに
+		# ならないため PDF を見るまで気づけない)。引用・リスト項目内の div も
+		# pandoc は受け付けるため、判定は行頭の引用符号・空白を落とした marker で行う。
+		case "$marker" in
+			':::'*)
+				spec=${marker#:::}
+				while [ "${spec#:}" != "$spec" ]; do
+					spec=${spec#:}
+				done
+				# 「::: info :::」のように末尾へ飾りの : を続ける書式も pandoc は
+				# 受け付けるため、前後の空白と末尾の : を落としてから判定する。
+				spec=$(printf '%s' "$spec" | sed -E 's/^[[:space:]]+//; s/[[:space:]]*:*[[:space:]]*$//')
+				if [ -z "$spec" ]; then
+					if [ "$div_depth" -eq 0 ]; then
+						echo "ERROR: $f:$lineno: 対応する開始フェンスのない閉じフェンス(:::)です(pandoc は div として認識せず、::: がそのまま本文に印字されます)。" >&2
+						found_error=1
+					else
+						div_depth=$((div_depth - 1))
+						div_stack=${div_stack% *}
+					fi
+				else
+					case "$spec" in
+						'{'*)
+							# 属性ブロック形式(::: {.info #id})。クラスは複数書けるため、
+							# いずれかが対応種類ならよい(admonitions.lua も最初に一致した
+							# 種類を使う)。
+							kinds=$(printf '%s' "$spec" | sed -E 's/^\{//; s/\}.*$//' | tr "$TAB" ' ' | tr ' ' '\n' | sed -n -E 's/^\.([^[:space:]]+)$/\1/p')
+							kind=""
+							for k in $kinds; do
+								case "$k" in
+									info|warning|error) kind=$k; break ;;
+								esac
+							done
+							if [ -z "$kind" ]; then
+								echo "WARNING: $f:$lineno: 注記ボックスの種類が info / warning / error のいずれでもありません(装飾なしのブロックとして出力されます): $line"
+								kind=$(printf '%s\n' "$kinds" | head -n1)
+								[ -n "$kind" ] || kind="div"
+							fi
+							div_depth=$((div_depth + 1))
+							div_stack="$div_stack $lineno:$kind"
+							;;
+						*' '*|*"$TAB"*)
+							# 種類名の後に文字が続く行(::: info 補足 など)は pandoc が div の
+							# 開始と見なさないため、開始として数えない(対応する閉じフェンス
+							# があれば上の不一致エラーで止まる)。
+							echo "WARNING: $f:$lineno: ::: で始まる行が注記ボックスの開始フェンスとして認識されません(「::: info」のように種類名だけを書きます): $line"
+							;;
+						*)
+							case "$spec" in
+								info|warning|error) ;;
+								*) echo "WARNING: $f:$lineno: 注記ボックスの種類 \"$spec\" は未対応です(info / warning / error のみ。それ以外は装飾なしのブロックとして出力されます): $line" ;;
+							esac
+							div_depth=$((div_depth + 1))
+							div_stack="$div_stack $lineno:$spec"
+							;;
+					esac
+				fi
+				;;
+		esac
+
 		# --- PlantUML 参照のチェック(1 行に複数の画像参照があってもすべて検査する) ---
 		# インラインコード内の記法説明(`![図](/build/diagrams/x.svg)` 等)を
 		# 実参照と誤検出しないよう、走査前にコードスパンを落とす(`` の 2 連
@@ -336,6 +406,14 @@ for f in "$@"; do
 			esac
 		fi
 	done < "$f"
+
+	# 閉じ忘れはファイル末尾で確定する(開始フェンスの行を指して報告する)。
+	if [ "$div_depth" -gt 0 ]; then
+		for entry in $div_stack; do
+			echo "ERROR: $f:${entry%%:*}: 注記ボックスの開始フェンス(::: ${entry#*:})に対応する閉じフェンス(:::)がありません(pandoc は div として認識せず、::: がそのまま本文に印字されます)。" >&2
+			found_error=1
+		done
+	fi
 done
 
 # --- 脚注定義 ID の重複チェック(章別ファイル分割ディレクトリごと) ---
@@ -361,7 +439,7 @@ for accum in "$tmp"/footnotes-*.txt; do
 done
 
 if [ "$found_error" -eq 1 ]; then
-	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・図/画像参照の不備のいずれかが見つかりました。上記の該当行を修正してください。" >&2
+	echo "lint: 見出しの手動採番エラー・フロントマターの不備・章ファイルへのフロントマター混入・図/画像参照の不備・注記ボックス(:::)のフェンス不一致のいずれかが見つかりました。上記の該当行を修正してください。" >&2
 	exit 1
 fi
 

@@ -39,7 +39,7 @@
 				<key>fontStyle</key>
 				<string>italic</string>
 				<key>foreground</key>
-				<string>#8a8a8a</string>
+				<string>#707070</string>
 			</dict>
 		</dict>
 		<dict>
@@ -129,7 +129,7 @@
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#5a5a5a</string>
+				<string>#4d4d4d</string>
 			</dict>
 		</dict>
 	</array>
